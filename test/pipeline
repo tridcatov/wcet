@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+llvm-g++ -O2 -S -emit-llvm a.c
+llvm-as a.s -f
+opt -load ../../bin/gcc/debug/libsingle_exit.so -single-exit a.s.bc -o a.single_exit.bc -f
+llvm-dis a.single_exit.bc -f
+opt -load ../../bin/gcc/debug/liblinearize.so -linearize a.single_exit.bc -o a.single_exit.linearize.bc -f
+llvm-dis a.single_exit.linearize.bc -f
+opt -load ../../bin/gcc/debug/libabstract_semantics -abstract-semantics a.single_exit.linearize.bc \
+   -o a.single_exit.linearize.abstract.bc -f
+llvm-dis a.single_exit.linearize.abstract.bc -f
+opt -dce -deadtypeelim a.single_exit.linearize.abstract.bc -o a.final.bc -f
+llvm-dis a.final.bc -f
+llc a.final.bc -o a.final.x86.s -f
+g++ test.cpp a.final.x86.s
+./a.out
