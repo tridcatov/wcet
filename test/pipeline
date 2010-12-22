@@ -8,7 +8,10 @@ llvmgcc=$llvmgcc"x86_64-unknown-linux-gnu-llvm-g++"
 llvmopt=$llvmtools"opt"
 llvmas=$llvmtools"llvm-as"
 
-$llvmgcc -O2 -S -emit-llvm test.cpp
-$llvmas test.s -f
-$llvmopt -load $passes"libhelloWorld.so" -hello < test.s.bc > /dev/null
+echo "[1:$1]Generating llvm source"
+$llvmgcc -O2 -S -emit-llvm $1.cpp
+echo "[2:$1]Assembling llvm source to bytecode"
+$llvmas $1.s -f
+echo "[3:$1]Swinging through functions, greetings"
+$llvmopt -load $passes"libhelloWorld.so" -hello < $1.s.bc > /dev/null
    
