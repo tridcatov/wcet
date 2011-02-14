@@ -1,17 +1,19 @@
 #!/bin/sh
 
-passes=~/term/new/build/deb/pass/
-llvmtools=~/term/llvm/build/Release+Asserts/bin/
-llvmgcc=~/term/llvm-gcc-bin/bin/
+passes=@PASSES_PATH@
+llvmtools=@LLVM_TOOLS@
+llvmgcc=@LLVM_GCC@
 
 llvmgcc=$llvmgcc"x86_64-unknown-linux-gnu-llvm-g++"
 llvmopt=$llvmtools"opt"
 llvmas=$llvmtools"llvm-as"
 
-echo "[1:$1]Generating llvm source"
+echo "[1:$1]Generating llvm source ($1.s)"
 $llvmgcc -O2 -S -emit-llvm $1.cpp
-echo "[2:$1]Assembling llvm source to bytecode"
+echo "[2:$1]Assembling llvm source to bytecode ($1.s.bc)"
 $llvmas $1.s -f
 echo "[3:$1]Swinging through functions, greetings"
 $llvmopt -load $passes"libhelloWorld.so" -hello < $1.s.bc > /dev/null
-   
+echo "[4:$1]Consequitive numbering of basic blocks"
+$llvmopt -load $passes"libbasicBlocksNumber.so" -basicBlocksNumber < $1.s.bc > /dev/null
+
