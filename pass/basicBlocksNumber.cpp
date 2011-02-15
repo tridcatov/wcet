@@ -69,7 +69,7 @@ bool Marker::runOnModule(Module &M)
             //Args[0] = ConstantUInt::get(/*Type::UIntTy*/Type::getInt32Ty(M.getContext()), BBNumber);
             //Args[0] = Constant::getIntegerValue(Type::getInt32Ty(M.getContext()), APInt(32,BBNumber));
             CallInst::Create(updating_function, arg, "", InsertPos);
-            errs() << "bbn: " << BB->getName() << " in " 
+            errs() << "[bbn] " << BB->getName() << " in " 
                 << F->getName() << " numbered as " << BBNumber << "\n";
 
             ++BBNumber;
