@@ -5,7 +5,7 @@ set (LLVM ~/term/llvm)
 set (LLVM_BUILD ${LLVM}/build)
 set (LLVM_RELEASE ${LLVM_BUILD}/Release+Asserts)
 set (LLVM_INCLUDE ${LLVM}/include ${LLVM_BUILD}/include)
-set (LLVM_LIBS ${LLVM_RELEASE}/lib)
+set (LLVM_LIBS ${LLVM_RELEASE}/lib/)
 
 set (PASSES_PATH ${CMAKE_CURRENT_BINARY_DIR}/pass/)
 set (LLVM_TOOLS ${LLVM_RELEASE}/bin/)
@@ -17,6 +17,7 @@ include_directories(
         )
 
 find_library (llvmSupport NAMES libLLVMSupport.a PATHS ${LLVM_LIBS})
+find_library (llvmAnalysis NAMES libLLVMAnalysis.a PATHS ${LLVM_LIBS})
 
 
 add_subdirectory(pass)
