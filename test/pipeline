@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 passes=@PASSES_PATH@
 llvmtools=@LLVM_TOOLS@
@@ -7,13 +7,36 @@ llvmgcc=@LLVM_GCC@
 llvmgcc=$llvmgcc"x86_64-unknown-linux-gnu-llvm-g++"
 llvmopt=$llvmtools"opt"
 llvmas=$llvmtools"llvm-as"
+llvmdis=$llvmtools"llvm-dis"
 
-echo "[1:$1]Generating llvm source ($1.s)"
+stage=0
+
+stage=$((stage+1))
+echo "[$stage:$1] Generating llvm source ($1.s)"
 $llvmgcc -O2 -S -emit-llvm $1.cpp
-echo "[2:$1]Assembling llvm source to bytecode ($1.s.bc)"
+
+stage=$((stage+1))
+echo "[$stage:$1] Assembling llvm source to bytecode ($1.s.bc)"
 $llvmas $1.s -f
-echo "[3:$1]Swinging through functions, greetings"
+
+stage=$((stage+1))
+echo "[$stage:$1] Swinging through functions, greetings"
 $llvmopt -load $passes"libhelloWorld.so" -hello < $1.s.bc > /dev/null
-echo "[4:$1]Consequitive numbering of basic blocks"
+
+stage=$((stage+1))
+echo "[$stage:$1] Consequitive numbering of basic blocks"
 $llvmopt -load $passes"libbasicBlocksNumber.so" -basicBlocksNumber < $1.s.bc > /dev/null
 
+stage=$((stage+1))
+echo "[$stage.0:$1] Single exit transformation ($1.se.bc)"
+$llvmopt -load $passes"libsingleExit.so" -singleExit $1.s.bc -o $1.se.bc -f
+echo "[$stage.1:$1] Single exit transformation dissasembly output ($1.se.ll)"
+$llvmdis $1.se.bc -f
+
+
+stage=$((stage+1))
+stage=$((stage+1))
+stage=$((stage+1))
+stage=$((stage+1))
+stage=$((stage+1))
+stage=$((stage+1))
