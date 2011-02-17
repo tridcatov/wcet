@@ -12,8 +12,10 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-using namespace llvm;
+#include <vector>
 
+using namespace llvm;
+using namespace std;
 /** The input to this pass is a function in SSA form. 
   We want to obtain a program that essentially tries all
   possible paths from the original program, and report the possible
@@ -80,6 +82,14 @@ struct control_transfer_data
 
 namespace {
     class LinearizePass: public FunctionPass {
+    private:
+        Function * mergeFunction;
+        Function * mergeOutFunction;
+        Function * currentFunction;
+
+        IntervalPartition* currentPartition;
+
+        void processPartition(const IntervalPartition& p, Function& f);
     public:
         static char ID;
         LinearizePass(): FunctionPass(ID) {}
@@ -94,5 +104,67 @@ namespace {
 };
 
 bool LinearizePass::runOnFunction(Function & f) {
-    return false;
+    outs() << "Processing function " << f.getName() << "\n";
+
+    currentFunction = &f;
+    Module * parent = f.getParent();
+    LLVMContext & context = f.getContext();
+
+    vector<const Type*> params;
+    params.push_back(Type::getInt32Ty(context));
+    FunctionType* ft = FunctionType::get(
+            Type::getInt32Ty(context),
+            params,
+            true);
+
+    /* Merging via Twine request */
+    parent->getOrInsertFunction ("merge_values", ft);
+    mergeFunction = parent->getFunction("merge_values");
+
+    parent->getOrInsertFunction(
+            "merge_out_value",
+            Type::getVoidTy(context),
+            PointerType::getUnqual(Type::getInt32Ty(context)),
+            Type::getInt32Ty(context),
+            Type::getInt1Ty(context),
+            0);
+    mergeOutFunction = parent->getFunction("merge_out_value");
+
+    IntervalPartition& intervals = getAnalysis<IntervalPartition>();
+    intervals.print(outs());
+
+    /* Creating partitions while reducible */
+    bool reducible = true;
+    vector<IntervalPartition *> tmp;
+    tmp.push_back(&intervals);
+    for (IntervalPartition* current = &intervals;
+            ! current->isDegeneratePartition();) {
+        IntervalPartition* next = new IntervalPartition(*current, false);
+        tmp.push_back(next);
+        if (next->getIntervals().size() == current->getIntervals().size()) {
+            reducible = false;
+            break;
+        } else {
+            current = next;
+        }
+    }
+
+    /* Processing each partition in order */
+    for(unsigned i = 0, e = tmp.size(); i < e; i++) {
+        outs() << i + 1 << "-order partition\n"; 
+        processPartition(*tmp[i], f);
+        outs() << "Code according to partition " << f << "\n";
+    }
+
+    assert(reducible);
+    
+    return true;
+}
+
+/* TODO: incomplete function */
+void LinearizePass::processPartition(const IntervalPartition& p,
+        Function& f) {
+    outs() << "Partition has " << p.getIntervals().size() << "intervals\n";
+
+
 }
