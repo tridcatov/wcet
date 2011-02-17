@@ -87,13 +87,14 @@ namespace {
         Function * mergeOutFunction;
         Function * currentFunction;
 
-        IntervalPartition* currentPartition;
+        const IntervalPartition* currentPartition;
 
         void processPartition(const IntervalPartition& p, Function& f);
     public:
         static char ID;
         LinearizePass(): FunctionPass(ID) {}
         bool runOnFunction(Function & f);
+        virtual void print(ostream &, const Module * = 0) const {}
     };
 
     char LinearizePass::ID =  0;
@@ -104,7 +105,7 @@ namespace {
 };
 
 bool LinearizePass::runOnFunction(Function & f) {
-    outs() << "Processing function " << f.getName() << "\n";
+    //outs() << "Processing function " << f.getName() << "\n";
 
     currentFunction = &f;
     Module * parent = f.getParent();
@@ -131,7 +132,7 @@ bool LinearizePass::runOnFunction(Function & f) {
     mergeOutFunction = parent->getFunction("merge_out_value");
 
     IntervalPartition& intervals = getAnalysis<IntervalPartition>();
-    intervals.print(outs());
+    //intervals.print(outs());
 
     /* Creating partitions while reducible */
     bool reducible = true;
@@ -151,20 +152,27 @@ bool LinearizePass::runOnFunction(Function & f) {
 
     /* Processing each partition in order */
     for(unsigned i = 0, e = tmp.size(); i < e; i++) {
-        outs() << i + 1 << "-order partition\n"; 
+      //  outs() << i + 1 << "-order partition\n"; 
         processPartition(*tmp[i], f);
-        outs() << "Code according to partition " << f << "\n";
     }
-
-    assert(reducible);
     
+    assert(reducible);
+
     return true;
 }
 
 /* TODO: incomplete function */
 void LinearizePass::processPartition(const IntervalPartition& p,
         Function& f) {
-    outs() << "Partition has " << p.getIntervals().size() << "intervals\n";
+    //outs() << "Partition has " << p.getIntervals().size() << "intervals\n";
 
+    currentPartition = &p;
+
+    const vector<Interval *>& intervals = p.getIntervals();
+    for(int i = 0, e = intervals.size(); i < e; i++) {
+        Interval* current = intervals[i];
+      //  outs() << "Processing interval:\n";
+      //  current->print(outs());
+    }
 
 }

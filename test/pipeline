@@ -30,11 +30,15 @@ $llvmopt -load $passes"libbasicBlocksNumber.so" -basicBlocksNumber < $1.s.bc > /
 stage=$((stage+1))
 echo "[$stage.0:$1] Single exit transformation ($1.se.bc)"
 $llvmopt -load $passes"libsingleExit.so" -singleExit $1.s.bc -o $1.se.bc -f
-echo "[$stage.1:$1] Single exit transformation dissasembly output ($1.se.ll)"
+echo "[$stage.1:$1] Single exit transformation disassembly output ($1.se.ll)"
 $llvmdis $1.se.bc -f
 
-
 stage=$((stage+1))
+echo "[$stage.0:$1] Linearize transformation ($1.li.bc)"
+$llvmopt -load $passes"liblinearize.so" -analyze -linearize $1.se.bc -o $1.li.bc -f
+echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
+$llvmdis $1.li.bc -f
+
 stage=$((stage+1))
 stage=$((stage+1))
 stage=$((stage+1))

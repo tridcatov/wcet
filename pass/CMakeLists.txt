@@ -8,6 +8,6 @@ add_library(singleExit SHARED singleExit.cpp)
 
 add_library(linearize SHARED linearize.cpp)
 set_target_properties(linearize PROPERTIES COMPILE_FLAGS "-fPIC")
-target_link_libraries(linearize ${llvmAnalysis})
+target_link_libraries(linearize ${llvmAnalysis} ${llvmSupport})
 
 add_library(helloWorld SHARED helloPass.cpp)

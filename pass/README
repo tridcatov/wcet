@@ -1,0 +1,5 @@
+Stangely, in 2.8 version there is no consistant method
+llvm::Pass::print(std::ostream &, Module * M), so Analysis pass 
+library would fail it's dynamic linkage and refused to be
+loaded into opt. So far this method is to be inserted in llvm::Pass 
+class, nevertheless it's declaration is closed with it's descendants
