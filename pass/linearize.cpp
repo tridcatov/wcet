@@ -15,6 +15,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <queue>
 
 using namespace llvm;
 using namespace std;
@@ -91,10 +92,10 @@ namespace {
 
         const IntervalPartition* currentPartition;
 
-        bool findScc(const Interval &, set<Interval *> &);
+        bool findScc(const Interval &, set<BasicBlock *> &);
         void processPartition(const IntervalPartition &, Function &);
         void processNonLoopingInterval(const Interval &, Function &);
-        void processLoopingInterval(const Interval &, set<Interval *> *,
+        void processLoopingInterval(const Interval &, set<BasicBlock *> *,
                 Function &);
     public:
         static char ID;
@@ -168,13 +169,39 @@ bool LinearizePass::runOnFunction(Function & f) {
 }
 
 /* TODO: incomplete function */
-bool LinearizePass::findScc(const Interval& I, set<Interval *>& scc) {
-    return true;
+bool LinearizePass::findScc(const Interval& I, set<BasicBlock *>& scc) { 
+    BasicBlock * header = I.getHeaderNode();
+
+    queue<BasicBlock *> worklist;
+    scc.insert(header);
+    worklist.push(header);
+    bool hasBackEdges = false;
+
+    while(! worklist.empty()) {
+        Interval * next = new Interval(worklist.front());
+        worklist.pop();
+        for (Interval::pred_iterator p = pred_begin(next),
+                e = pred_end(next); p != e; p++) {
+            if (*p == header)
+                hasBackEdges = true;
+
+            if (I.contains(*p)) {
+                if (scc.count(*p) == 0) {
+                    worklist.push(*p);
+                    scc.insert(*p);
+                }
+            }
+
+        }
+        delete next;
+    }
+
+    return hasBackEdges;
 }
 
 /* TODO: incomplete function */
 void LinearizePass::processLoopingInterval(const Interval & current,
-        set<Interval *> * scc, Function & f) {
+        set<BasicBlock *> * scc, Function & f) {
 
 }
 
@@ -184,7 +211,6 @@ void LinearizePass::processNonLoopingInterval(const Interval & current,
 
 }
 
-/* TODO: incomplete function */
 void LinearizePass::processPartition(const IntervalPartition& p,
         Function& f) {
     outs() << "Partition has " << p.getIntervals().size() << "intervals\n";
@@ -197,7 +223,7 @@ void LinearizePass::processPartition(const IntervalPartition& p,
         outs() << "Processing interval:\n";
         current->print(outs());
 
-        set<Interval *> scc;
+        set<BasicBlock *> scc;
         bool has_scc = findScc(*current, scc);
 
         if (has_scc)
