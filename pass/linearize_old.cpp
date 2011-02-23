@@ -10,7 +10,6 @@
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
@@ -51,8 +50,8 @@ namespace {
     enum colors { white = 0, gray, black };
 
     void topo_sort(BasicBlock* bb, const set<BasicBlock*>& limit,
-            set<BasicBlock*>& visited,
-            vector<BasicBlock*>& result)
+                   set<BasicBlock*>& visited,
+                   vector<BasicBlock*>& result)
     {
         visited.insert(bb);
         for(succ_iterator i = succ_begin(bb), e = succ_end(bb); i != e; ++i)
@@ -72,46 +71,46 @@ namespace {
 #include <queue>
 
 /** The input to this pass is a function in SSA form. 
-  We want to obtain a program that essentially tries all
-  possible paths from the original program, and report the possible
-  value ranges for all variables at the end of the function.
+    We want to obtain a program that essentially tries all
+    possible paths from the original program, and report the possible
+    value ranges for all variables at the end of the function.
 
-  The transformation conceptually has two parts. If we have
+    The transformation conceptually has two parts. If we have
 
-  B
-  /\
-  /  \
-  /    \
-  T1    T2
-  |      |
-  |      |
-  F1    F2 
-  \    /
-  \  /
-  M
+               B
+              /\
+             /  \
+            /    \
+           T1    T2
+           |      |
+           |      |
+           F1    F2 
+            \    /
+             \  /
+               M
 
-  then it's possible that some variables are modified in either left
-  or right branch. So, we execute both branches. Then, the M node will
-  what phis for all variables which are modified either on right or on
-  the left. We convert those phi nodes into value merges.
+    then it's possible that some variables are modified in either left
+    or right branch. So, we execute both branches. Then, the M node will
+    what phis for all variables which are modified either on right or on
+    the left. We convert those phi nodes into value merges.
 
-  To simplify our work, we use the notion of 'interval'. Interval is 
-  a maximal single-entry subgraph, suchs that every cycle in that subgraph
-  goes through the entry node. Every control flow graph can be partioned
-  into a set of intervals. Those intervals are called "first-order" intervals.
+    To simplify our work, we use the notion of 'interval'. Interval is 
+    a maximal single-entry subgraph, suchs that every cycle in that subgraph
+    goes through the entry node. Every control flow graph can be partioned
+    into a set of intervals. Those intervals are called "first-order" intervals.
 
-  If we form a new graph, with first order intervals as vertices, we can 
-  find "second-order" intervals. The process can be repeated. If we finally
-  end with a graph with a single vertex, the original graph is called 
-  reducible.
+    If we form a new graph, with first order intervals as vertices, we can 
+    find "second-order" intervals. The process can be repeated. If we finally
+    end with a graph with a single vertex, the original graph is called 
+    reducible.
 
-  We process the function starting from the first-order intervals.
-  For each interval we nuke absolutely any branches we find in the
-  interval. If 
+    We process the function starting from the first-order intervals.
+    For each interval we nuke absolutely any branches we find in the
+    interval. If 
+    
 
 
-
-
+               
 
 
 */
@@ -148,22 +147,22 @@ namespace {
         void init_control_transfer_data(const IntervalPartition& P);
 
 
-        //      BasicBlock* runOnRange(BasicBlock* start, BasicBlock* end);
+//      BasicBlock* runOnRange(BasicBlock* start, BasicBlock* end);
         void processPartition(const IntervalPartition& P, Function& F);
         void prcessIntervals(const vector<Interval*> intervals, Function& F);
         void processNonLoopingInterval(const Interval& current, 
-                Function& F);
+                                       Function& F);
         void processLoopingInterval(const Interval& current, 
-                set<Interval*>* scc,
-                Function& F);
+                                    set<Interval*>* scc,
+                                    Function& F);
         void processLowerInverval(const Interval& lower, 
-                const Interval& current, bool merge_bypassed);
+                                  const Interval& current, bool merge_bypassed);
         void createGates(const Interval& current, Function& F,              
-                set<Interval*>* scc = 0);
+                         set<Interval*>* scc = 0);
         bool runOnFunction(Function& F);
-
+        
         void convertPHINodes(const Interval& current);
-
+        
         void find_bbs(const Interval* I, set<BasicBlock*>& result);
         void find_bbs_v(const vector<Interval*>& I, set<BasicBlock*>& result);
         void find_live_vars(const Interval* interval, set<Value*>& live);
@@ -178,15 +177,13 @@ namespace {
 
         // Basic blocks we've added to interval.
         map<const Interval*, set<BasicBlock*> > extra_bbs;
-
+        
         Function* current_function_;
 
-        public: // Information local for each processPartition invocation.
+    public: // Information local for each processPartition invocation.
         const IntervalPartition* current_partition;
-        static char ID;
-        LinearizePass(): FunctionPass(ID) {} 
 
-        public: // information local for each processNonLoopingInterval
+    public: // information local for each processNonLoopingInterval
         // invocation.        
 
         map<const Interval*, vector<Value*> > execution_condition;
@@ -200,29 +197,22 @@ namespace {
         // it's a gate block for the next interval.
         map<const Interval*, BasicBlock*> next_gate_block;
     };
-    /* Registering in 2.8 style */
-    /*
-       RegisterOpt<LinearizePass> X("linearize",
-       "Remote all conditionals");
-       */
-    char LinearizePass::ID =  0;
-    INITIALIZE_PASS(LinearizePass,
-            "linearize",
-            "Remote all conditionals",
-            true, true);
+    
+    RegisterOpt<LinearizePass> X("linearize",
+                                "Remote all conditionals");
 }
 
 void LinearizePass::getAnalysisUsage(AnalysisUsage &Info) const
 {
     Info.setPreservesCFG();
     Info.addRequired<IntervalPartition>();
-    //  Info.addRequired<DominatorTree>();
-    //  Info.addRequired<DominanceFrontier>();
+//  Info.addRequired<DominatorTree>();
+//  Info.addRequired<DominanceFrontier>();
 }
 
 bool find_scc(const Interval& I, set<Interval*>& scc)
 {
-    Interval* header = new Interval(I.getHeaderNode());
+    Interval* header = I.getHeaderNode();
 
     // Since all cycles should pass through the header,
     // we can find all the members of SCC by finding headers's
@@ -238,7 +228,7 @@ bool find_scc(const Interval& I, set<Interval*>& scc)
         Interval* next = worklist.front();
         worklist.pop();
         for (Interval::pred_iterator p = pred_begin(next), e = pred_end(next); 
-                p != e; ++p)
+             p != e; ++p)
         {
             if (*p == header)
                 has_back_edges = true;
@@ -255,8 +245,7 @@ bool find_scc(const Interval& I, set<Interval*>& scc)
             }
         }
     }
-
-    delete header;
+    
     return has_back_edges;
 }
 
@@ -265,7 +254,7 @@ void find_defs(const Interval* I, set<Value*>& result)
 {
     if (I->Nodes.empty())
     {
-        BasicBlock* b = I->getHeaderNode();
+        BasicBlock* b = I->getHeaderBlock();
         for(BasicBlock::iterator i = b->begin(); i != b->end(); ++i)
             result.insert(i);
     }
@@ -286,7 +275,7 @@ void LinearizePass::find_bbs(const Interval* I, set<BasicBlock*>& result)
 {
     if (I->Nodes.empty())
     {
-        BasicBlock* b = I->getHeaderNode();
+        BasicBlock* b = I->getHeaderBlock();
         result.insert(b);
     }
     else
@@ -313,14 +302,14 @@ void LinearizePass::find_live_vars(const Interval* interval, set<Value*>& live)
     find_defs(interval, defs);
 
     for(set<Value*>::iterator i = defs.begin();
-            i != defs.end();
-            ++i)
+        i != defs.end();
+        ++i)
     {
         if ((*i)->getType() == Type::VoidTy)
             continue;
 
         for(Value::use_iterator j = (*i)->use_begin();
-                j != (*i)->use_end(); ++j)
+            j != (*i)->use_end(); ++j)
         {
             User* u = (*j);            
             Instruction* inst = dyn_cast<Instruction>(u);
@@ -328,10 +317,10 @@ void LinearizePass::find_live_vars(const Interval* interval, set<Value*>& live)
             if (inst && bbs.count(inst->getParent()) == 0)
             {
                 live.insert(*i);
-                ;//errs() << "Live var: " << **i << "\n";
-                ;//errs() << "Used by: " << *u << "\n";
-                ;//errs() << "Interval: " << *i << "\n";
-                ;//errs() << "User's parent: " << *inst->getParent() << "\n";
+                cout << "Live var: " << **i << "\n";
+                cout << "Used by: " << *u << "\n";
+                cout << "Interval: " << *i << "\n";
+                cout << "User's parent: " << *inst->getParent() << "\n";
             }
         }        
     }    
@@ -345,28 +334,28 @@ void LinearizePass::find_live_vars_v(const vector<Interval*>& I, set<Value*>& li
 /* Replace all users of 'from' which are not amoung 'restricted_users',
    and which are not in basic blocks that are in 'restricted_blocks', with
    'to'.
-   */
+*/
 void replaceSomeUsers(Value* from, Value* to,
-        const set<BasicBlock*>& restricted_blocks,
-        const set<Value*>& restricted_users)
+                      const set<BasicBlock*>& restricted_blocks,
+                      const set<Value*>& restricted_users)
 {
     std::vector<User*> users(from->use_begin(), from->use_end());
     for(unsigned i = 0; i < users.size(); ++i)
     {
         Instruction* user = cast<Instruction>(users[i]);
-        ;//errs() << "user " << *user << "\n";
-
+        cout << "user " << *user << "\n";
+        
         if (restricted_users.count(user))
         {
-            ;//errs() << "user " << *user << " is inside restricted users\n";
+            cout << "user " << *user << " is inside restricted users\n";
         }
         if (restricted_users.count(user->getParent()))
         {
-            ;//errs() << "user " << *user << " is inside restricted block\n";
+            cout << "user " << *user << " is inside restricted block\n";
         }
-
+        
         if (restricted_users.count(user) == 0 &&
-                restricted_blocks.count(user->getParent()) == 0)
+            restricted_blocks.count(user->getParent()) == 0)
         {
             user->replaceUsesOfWith(from, to);
         }
@@ -374,18 +363,18 @@ void replaceSomeUsers(Value* from, Value* to,
 }
 
 /** Folds the passed values from right with the specified
-  binary operation. Adds new instruction to 'add_to'.
-  Results the resulting value.
-  */
+    binary operation. Adds new instruction to 'add_to'.
+    Results the resulting value.
+*/
 Value* foldr(const vector<Value*>& values, Instruction::BinaryOps op, 
-        BasicBlock* add_to)
+             BasicBlock* add_to)
 {
     Value* result = values[0];
     for(unsigned i = 1; i < values.size(); ++i)
     {
         result = BinaryOperator::create(op,
-                result, values[i], "",
-                add_to);
+                                        result, values[i], "",
+                                        add_to);
     }
     return result;
 }
@@ -393,21 +382,21 @@ Value* foldr(const vector<Value*>& values, Instruction::BinaryOps op,
 Value* convertToAlloca(Value* v, Function* f)
 {
     AllocaInst* result = new AllocaInst(v->getType(), 0, "local", f->front().getFirstNonPHI());
-
-    // All uses must be replaced with loads. Do this before adding initialization,
-    // to avoid replacing initializations too.
+            
+            // All uses must be replaced with loads. Do this before adding initialization,
+            // to avoid replacing initializations too.
     std::vector<User*> uses(v->use_begin(), v->use_end());
-
+            
     for(unsigned i = 0; i < uses.size(); ++i)
     {
         Instruction* user = dyn_cast<Instruction>(uses[i]);
         assert(user);
-
-        ;//errs() << "Replacing in " << *user << "\n";
-
+                
+        cout << "Replacing in " << *user << "\n";
+                
         if (PHINode* n = dyn_cast<PHINode>(user))
         {
-            // Should add load into predecessor block.
+                    // Should add load into predecessor block.
             BasicBlock* predecessor;
             for(unsigned i = 0; i < n->getNumIncomingValues(); ++i)
             {
@@ -416,7 +405,7 @@ Value* convertToAlloca(Value* v, Function* f)
                     predecessor = n->getIncomingBlock(i);
                 }
             }
-
+            
             Value* loaded = new LoadInst(result, "", &predecessor->back());
             user->replaceUsesOfWith(v, loaded);
         }
@@ -426,7 +415,7 @@ Value* convertToAlloca(Value* v, Function* f)
             user->replaceUsesOfWith(v, loaded);
         }
     }
-
+            
     if (Instruction* inst = dyn_cast<Instruction>(v))
     {
         BasicBlock* bb = inst->getParent();
@@ -437,30 +426,30 @@ Value* convertToAlloca(Value* v, Function* f)
     }
     else
     {
-        // Must be a global value, or argument, or something. Copy into alloca right
-        // after alloca definition.
+                // Must be a global value, or argument, or something. Copy into alloca right
+                // after alloca definition.
         new StoreInst(v, result, result->getNext());
     }
-
+            
 
     return result;
 }
 
 /** Processes a single interval from a lower-level partition.
-  Adds correct branch to the gate block for this interval,
-  and adds phi nodes for all variables modified in this
-  interval to the next gate block.
+    Adds correct branch to the gate block for this interval,
+    and adds phi nodes for all variables modified in this
+    interval to the next gate block.
 
-  If 'merge_bypassed' is true, add phi instructions to
-  the gate following 'lower' for every value set in that
-  block.
-  */
-    void
+    If 'merge_bypassed' is true, add phi instructions to
+    the gate following 'lower' for every value set in that
+    block.
+*/
+void
 LinearizePass::processLowerInverval(const Interval& lower, 
-        const Interval& current,
-        bool merge_bypassed = true)
+                                    const Interval& current,
+                                    bool merge_bypassed = true)
 {
-    //    //DEBUG(std::;//errs() << "Processing interval\n" << &lower << " " << lower);
+    DEBUG(std::cout << "Processing interval\n" << &lower << " " << lower);
 
     // 1. CREATE GATE BRANCH.
 
@@ -473,27 +462,27 @@ LinearizePass::processLowerInverval(const Interval& lower,
         assert(execution_condition.count(&lower));
 
         Value* final_condition = foldr(execution_condition[&lower],
-                BinaryOperator::Or,
-                gate_block[&lower]);
+                                       BinaryOperator::Or,
+                                       gate_block[&lower]);
 
 #if 0
         vector<Value*> ex = execution_condition[&lower];
         Value* final_condition = ex[0];
-
+        
         for(unsigned i = 1; i < ex.size(); ++i)
         {
             final_condition = BinaryOperator::create(
-                    BinaryOperator::Or,
-                    final_condition,
-                    ex[i],
-                    "", gate_block[&lower]);
+                BinaryOperator::Or,
+                final_condition,
+                ex[i],
+                "", gate_block[&lower]);
         }               
 #endif
         gate[&lower] = final_condition;
 
 
         new BranchInst(first_basic_block[&lower], next_gate_block[&lower],
-                final_condition, gate_block[&lower]);
+                       final_condition, gate_block[&lower]);
     }
 
     // 2. PROPAGATE EXECUTION CONDITION
@@ -515,7 +504,7 @@ LinearizePass::processLowerInverval(const Interval& lower,
     //                          [ false, label %gate2 ]
     //
     // as use 'cond_merge' as final execution condition
-
+    
     // The set 
     set<Value*> accounted_phis;
 
@@ -524,7 +513,7 @@ LinearizePass::processLowerInverval(const Interval& lower,
     {
         control_transfer_data& ct = cts[i];
 
-        //  //DEBUG(std::;//errs() << "Control transfer to " << *ct.target << "\n");
+        DEBUG(std::cout << "Control transfer to " << *ct.target << "\n");
 
         Value* propagated_condition;
 
@@ -534,7 +523,7 @@ LinearizePass::processLowerInverval(const Interval& lower,
             PHINode* phi = new PHINode(Type::BoolTy);
             next_gate_block[&lower]->getInstList().push_front(phi);
             phi->addIncoming(ConstantBool::get(false),
-                    gate_block[&lower]);
+                             gate_block[&lower]);
             phi->addIncoming(ct.condition, last);
             propagated_condition = phi;
             accounted_phis.insert(phi);
@@ -557,9 +546,9 @@ LinearizePass::processLowerInverval(const Interval& lower,
             control_transfer_data ct2 = ct;
             ct2.target = current_partition->getInterval(ct2.target);
             control_transfers[&current].push_back(ct2);
-
-            std::;//errs() << "External control transfer!!!!!!!!!!!!!\n";
-            std::;//errs() << "To" << *ct2.target << "\n";
+            
+            std::cout << "External control transfer!!!!!!!!!!!!!\n";
+            std::cout << "To" << *ct2.target << "\n";
         }        
     }
 
@@ -573,23 +562,23 @@ LinearizePass::processLowerInverval(const Interval& lower,
     {
         set<BasicBlock*> bbs;
         find_bbs(&lower, bbs);
-
+        
 
         set<Value*> defs;
         find_live_vars(&lower, defs);
-
+        
         for(set<Value*>::iterator i = defs.begin();
-                i != defs.end();
-                ++i)
+            i != defs.end();
+            ++i)
         {
             if ((*i)->getType() == Type::VoidTy)
                 continue;
-
-            ;//errs() << "Found bypassed value: " << **i << "\n";
-
+            
+            cout << "Found bypassed value: " << **i << "\n";
+            
             //convertToAlloca(*i, current_function_);
 
-
+             
 #if 1
             PHINode* phi = new PHINode((*i)->getType(), "merge_bypassed");
             next_gate_block[&lower]->getInstList().push_front(phi);
@@ -614,9 +603,9 @@ LinearizePass::processLowerInverval(const Interval& lower,
             assert(gate_block[&lower]);
             BasicBlock* last = last_basic_block[&lower];
             phi->addIncoming(UndefValue::get((*i)->getType()),
-                    gate_block[&lower]);
+                             gate_block[&lower]);
             phi->addIncoming(*i, last);
-            ////DEBUG(std::;//errs() << "Added " << *phi);
+            DEBUG(std::cout << "Added " << *phi);
 #endif            
         }
     }
@@ -626,13 +615,13 @@ LinearizePass::processLowerInverval(const Interval& lower,
 }
 
 /** For each subinterval in 'current', create empty gate
-  block.
-  Initialize the 'gate_block' and 'next_gate_block' maps.
-  Add jump instructions to the gate blocks.
-  */
-    void
+    block.
+    Initialize the 'gate_block' and 'next_gate_block' maps.
+    Add jump instructions to the gate blocks.
+*/
+void
 LinearizePass::createGates(const Interval& current, Function& F,
-        set<Interval*>* scc)
+                           set<Interval*>* scc)
 {
     // First of all create a new basic block that will end this interval.    
     BasicBlock* interval_end;
@@ -641,7 +630,7 @@ LinearizePass::createGates(const Interval& current, Function& F,
         // new basic block will be added and can be arbitrary.
         BasicBlock* last = last_basic_block[current.Nodes.back()];
         interval_end = new BasicBlock("interval_finish", &F, last->getNext());
-
+        
         // If any nested intervals have 'return' statement, we need to move
         // that return statement to 'interval_finish', and then add jump
         // to interval_finish.
@@ -683,8 +672,7 @@ LinearizePass::createGates(const Interval& current, Function& F,
     }
     else
     {
-        //TODO: check type integrity on allocators here
-        //Nodes.assign(current.Nodes.begin(), current.Nodes.end());
+        Nodes.assign(current.Nodes.begin(), current.Nodes.end());
     }
 
     // Create gate blocks. The first interval does not need any.
@@ -694,30 +682,30 @@ LinearizePass::createGates(const Interval& current, Function& F,
 
         BasicBlock* gb = new BasicBlock("gate", &F, first_basic_block[Int]);
         extra_bbs[&current].insert(gb);
-
+        
         gate_block[Int] = gb;
 
         next_gate_block[Nodes[i-1]] = gb;
     }
 
     next_gate_block[Nodes.back()] = interval_end;            
-
+    
     last_basic_block[&current] = interval_end;
 }
 
 /** Processes one interval of the current partition.
-  Sets the first_basic_block, last_basic_block and
-  control_transfers data for that interval.
-  */
-    void 
+    Sets the first_basic_block, last_basic_block and
+    control_transfers data for that interval.
+*/
+void 
 LinearizePass::processNonLoopingInterval(const Interval& current, 
-        Function& F)
+                                         Function& F)
 {
     execution_condition.clear();
     gate.clear();
     gate_block.clear();
     next_gate_block.clear();
-
+    
 
     createGates(current, F);
 
@@ -734,7 +722,7 @@ LinearizePass::processNonLoopingInterval(const Interval& current,
     }
 
     new BranchInst(next_gate_block[current.Nodes.front()],
-            last_basic_block[current.Nodes.front()]);
+                   last_basic_block[current.Nodes.front()]);
 #endif
 
 
@@ -750,9 +738,9 @@ LinearizePass::processNonLoopingInterval(const Interval& current,
 
     // SET FIRST AND LAST BASIC BLOCKS
     first_basic_block[&current] = first_basic_block[current.getHeaderNode()];
-
+    
     // last basic block is set in createGates
-
+    
     //last_basic_block[&current] = next_gate_block[current.Nodes.back()];
 }
 
@@ -765,7 +753,7 @@ void LinearizePass::convertPHINodes(const Interval& current)
 
         if (looping[Int])
         {
-            BasicBlock* bb = Int->getHeaderNode();
+            BasicBlock* bb = Int->getHeaderBlock();
             Instruction* Inst = bb->begin();
             for(; isa<PHINode>(Inst); Inst = Inst->getNext())
             {
@@ -776,12 +764,12 @@ void LinearizePass::convertPHINodes(const Interval& current)
             }
             continue;
         }
-
+        
         // All of PHI nodes in the interval, except in the first
         // block, were processed previously. We only need
         // to look at the first block.
-        BasicBlock* bb = Int->getHeaderNode();
-
+        BasicBlock* bb = Int->getHeaderBlock();
+        
         Instruction* Inst = bb->begin();
         for(;; Inst = Inst->getNext())
         {            
@@ -795,12 +783,12 @@ void LinearizePass::convertPHINodes(const Interval& current)
                 // basic block. 
                 map<BasicBlock*, control_transfer_data> bb2ct;
                 for(Interval::pred_iterator p = pred_begin(Int);
-                        p != pred_end(Int);
-                        ++p)
+                    p != pred_end(Int);
+                    ++p)
                 {
                     const vector<control_transfer_data>& ct2
-                        = control_transfers[*p];
-
+                            = control_transfers[*p];
+                    
                     for(unsigned k = 0; k < ct2.size(); ++k)
                     {
                         control_transfer_data d = ct2[k];
@@ -811,11 +799,11 @@ void LinearizePass::convertPHINodes(const Interval& current)
                         }
                     }
                 }
-
-                //DEBUG(std::;//errs() << "PHINode: " << *phi << "\n");
+                
+                DEBUG(std::cout << "PHINode: " << *phi << "\n");
                 vector<Value*> parameters;
-                parameters.push_back(ConstantInt::get(Type::getInt32Ty(phi->getContext()),
-                            phi->getNumIncomingValues()));
+                parameters.push_back(ConstantInt::get(Type::IntTy,
+                                     phi->getNumIncomingValues()));
                 for(unsigned k = 0; k < phi->getNumIncomingValues(); ++k)
                 {
                     BasicBlock* pred = phi->getIncomingBlock(k);
@@ -824,18 +812,15 @@ void LinearizePass::convertPHINodes(const Interval& current)
                     // Cast to int, so that passing via "..."
                     // works.
                     Value* cond_int = 
-                        new CastInst(cond, Type::getInt32Ty(cond->getContext), "", phi);
+                            new CastInst(cond, Type::IntTy, "", phi);
                     parameters.push_back(cond_int);                            
-                    //DEBUG(std::;//errs() << "Incoming value " << k 
-                    //        << " -- condition is " << *cond
-                    //        << "\n");
+                    DEBUG(std::cout << "Incoming value " << k 
+                            << " -- condition is " << *cond
+                            << "\n");
                     parameters.push_back(phi->getIncomingValue(k));
                 }                        
-                Instruction* call = CallInst::Create<vector<Value *>::iterator>(
-                        m_merge_func,
-                        parameters.begin(),
-                        parameters.end(), "", phi);
-
+                Instruction* call = 
+                        new CallInst(m_merge_func, parameters, "", phi);
                 Inst->replaceAllUsesWith(call);
                 Inst->eraseFromParent();
                 Inst = call;
@@ -849,28 +834,27 @@ void LinearizePass::convertPHINodes(const Interval& current)
     }
 }
 
-    void 
+void 
 LinearizePass::processLoopingInterval(const Interval& current, 
-        set<Interval*>* scc,
-        Function& F)
+                                      set<Interval*>* scc,
+                                      Function& F)
 {
-    //Interval* header = current.getHeaderNode();
-    BasicBlock* header = current.getHeaderNode();
-
+    Interval* header = current.getHeaderNode();
+    
     looping[&current] = true;
 
     execution_condition.clear();
     gate.clear();
     gate_block.clear();
     next_gate_block.clear();
-
+    
     createGates(current, F, scc);
-
+    
     for(unsigned i = 0; i < current.Nodes.size(); ++i)
     {
         processLowerInverval(*current.Nodes[i], current);
     }
-
+    
     // Compute some information about SCC
     // Last interval in SCC
     Interval* last_in_scc = 0;
@@ -880,99 +864,94 @@ LinearizePass::processLoopingInterval(const Interval& current,
     for(unsigned i = 0; i < current.Nodes.size(); ++i)
     {
         if (scc->count(current.Nodes[i])) {
-            last_in_scc = new Interval(current.Nodes[i]);
-            intervals_in_scc.push_back(last_in_scc);
-            //intervals_in_scc.push_back(current.Nodes[i]);
+            last_in_scc = current.Nodes[i];
+            intervals_in_scc.push_back(current.Nodes[i]);
         } else {
             if (!first_outside_scc)
-                first_outside_scc = new Interval(current.Nodes[i]);
-            intervals_outside_scc.push_back(new Interval(current.Nodes[i]));
+                first_outside_scc = current.Nodes[i];
+            intervals_outside_scc.push_back(current.Nodes[i]);
         }
     }
-
-
+    
+    
     // We're about to add basic blocks that cause loop to iterate.
-
+    
     // However, we need to merge bypassed values from loop body before
     // going to the next iteration, not on the next. So, move all
     // phi nodes form the next gate into the loop.
-
+    
     BasicBlock* first_gate_outside = gate_block[first_outside_scc];
-
+    
     BasicBlock* merge_values_bypassed_in_last_interval =
-        BasicBlock::Create(F.getContext(), "merge_values_bypassed_in_last_interval",
-                &F, gate_block[first_outside_scc]);
+            new BasicBlock("merge_values_bypassed_in_last_interval",
+                           &F, gate_block[first_outside_scc]);
     extra_bbs[&current].insert(merge_values_bypassed_in_last_interval);
-
+    
     BasicBlock* check_if_jump_out_is_possible =
-        BasicBlock::Create(F.getContext(),
-                "check_if_jump_out_is_possible",
-                &F, first_gate_outside);
+            new BasicBlock("check_if_jump_out_is_possible",
+                           &F, first_gate_outside);
     extra_bbs[&current].insert(check_if_jump_out_is_possible);
-
+    
     BasicBlock* merge_out_values = 
-        BasicBlock::Create(F.getContext(), "merge_out_values",
-                &F, first_gate_outside);
+            new BasicBlock("merge_out_values",
+                           &F, first_gate_outside);
     extra_bbs[&current].insert(merge_out_values);
-
-    BasicBlock* branch_back = BasicBlock::Create(F.getContext(),
-            "branch_back",
-            &F, first_gate_outside);
+    
+    BasicBlock* branch_back = new BasicBlock("branch_back",
+                                             &F, first_gate_outside);
     extra_bbs[&current].insert(branch_back);
-
-    BasicBlock* load_out_values = BasicBlock::Create(F.getContext(),
-            "load_out_values",
+    
+    BasicBlock* load_out_values = new BasicBlock("load_out_values",
             &F, first_gate_outside);
     extra_bbs[&current].insert(load_out_values);
+    
 
-
-    BranchInst::Create(branch_back, merge_out_values);
-
-    BranchInst::Create(check_if_jump_out_is_possible, merge_values_bypassed_in_last_interval);
-
-
+    new BranchInst(branch_back, merge_out_values);
+    
+    new BranchInst(check_if_jump_out_is_possible, merge_values_bypassed_in_last_interval);
+    
+    
     if (first_outside_scc)
-        BranchInst::Create(gate_block[first_outside_scc], load_out_values);
+        new BranchInst(gate_block[first_outside_scc], load_out_values);
     else
-        BranchInst::Create(last_basic_block[&current], load_out_values);
-
+        new BranchInst(last_basic_block[&current], load_out_values);
+    
     // The jump from last gate in SCC should go to 'merge_values_bypassed_in_last_interval',
     // not to gate block outsude.
     gate_block[last_in_scc]->getTerminator()->replaceUsesOfWith(
             first_gate_outside, merge_values_bypassed_in_last_interval);
-
+    
     // Same for last interval
     last_basic_block[last_in_scc]->getTerminator()->replaceUsesOfWith(
             first_gate_outside, merge_values_bypassed_in_last_interval);
+    
+    
+            
+    
+    
 
-
-
-
-
-
-
+    
     for(;;)
     {
         if (!first_gate_outside)
             break;
-
+        
         PHINode* phi = dyn_cast<PHINode>(&(first_gate_outside->front()));
         if (!phi)
             break;
         phi->moveBefore(merge_values_bypassed_in_last_interval->getTerminator());
     }
-
-
+             
+    
     set<BasicBlock*> bbs_in_scc;
     find_bbs_v(intervals_in_scc, bbs_in_scc);
     // Fix the PHI nodes at the entry block. For values from the loop, they
     // refer to the basic block that originally generated this value.
     // Now, it should refer to the 'branch_back' basic block.
     {
-        //TODO.unfold: return underlying
-        //BasicBlock* first = first_basic_block[current.getHeaderNode()];
-        BasicBlock* first = 0;
+        BasicBlock* first = first_basic_block[current.getHeaderNode()];
         BasicBlock::iterator i = first->begin(), e = first->end();
+        
         for(;i != e; ++i)
         {
             PHINode* phi = dyn_cast<PHINode>(i);
@@ -984,7 +963,7 @@ LinearizePass::processLoopingInterval(const Interval& current,
                 if (bbs_in_scc.count(phi->getIncomingBlock(j)))
                     ++jumps_from_inside;
             }
-
+            
             if (jumps_from_inside == 1)
             {
                 for(unsigned j = 0; j < phi->getNumIncomingValues(); ++j)
@@ -999,17 +978,17 @@ LinearizePass::processLoopingInterval(const Interval& current,
                 // We need to merge value ranges of values that go from loop basic blocks.
                 // and since that merge is a call instructoin it can'be be placed in
                 // loop header, but only in loop branch back block.
-
-                PHINode* merge_from_loop = PHINode::Create(phi->getType(), "", 
+                
+                PHINode* merge_from_loop = new PHINode(phi->getType(), "", 
                         branch_back);
-
+                
                 for(unsigned j = 0; j < phi->getNumIncomingValues();)
                 {
                     if (bbs_in_scc.count(phi->getIncomingBlock(j)))
                     {
                         merge_from_loop->addIncoming(phi->getIncomingValue(j),
                                 phi->getIncomingBlock(j));
-
+                        
                         phi->removeIncomingValue(j);
                         // Don't increment 'j', as removal shifts indixes
                     }
@@ -1020,40 +999,40 @@ LinearizePass::processLoopingInterval(const Interval& current,
                 }
                 phi->addIncoming(merge_from_loop, branch_back);                
             }
-
-
+            
+            
         }
-
+    
     }        
-
-
+    
+    
     // Find the expression that determines is the next iteration of
     // the loop will be taken. Add branch back to header subject
     // to that condition.
     {
-        // Create the back branch to loop header.
-        Interval* header = new Interval(current.getHeaderNode());
+    // Create the back branch to loop header.
+        Interval* header = current.getHeaderNode();
         assert(execution_condition.count(header));
         vector<Value*> ex = execution_condition[header];
         Value* final_condition = ex[0];
-
+    
         for(unsigned i = 1; i < ex.size(); ++i)
         {
-            final_condition = BinaryOperator::Create(
+            final_condition = BinaryOperator::create(
                     BinaryOperator::Or,
-                    final_condition,
-                    ex[i],
-                    "", branch_back);
+            final_condition,
+            ex[i],
+            "", branch_back);
         }               
         gate[header] = final_condition;
-
-        BranchInst::Create(first_basic_block[header], 
-                load_out_values,
-                final_condition, branch_back);
-
+       
+        new BranchInst(first_basic_block[header], 
+                       load_out_values,
+                       final_condition, branch_back);
+        
         //new BranchInst(first_basic_block[current.getHeaderNode()], branch_back);
     }
-
+    
     // First expresion that determines if we will jump out of the loop.
     {
         vector<Value*> jumps_out_of_loop_condition;
@@ -1061,34 +1040,34 @@ LinearizePass::processLoopingInterval(const Interval& current,
         {
             BOOST_FOREACH(const control_transfer_data& ct, control_transfers[I]) 
             {
-                if (bbs_in_scc.count(ct.target->getHeaderNode()) == 0) {
-                    //DEBUG(std::;//errs() << "Jump out of loop on " 
-                    //   << *ct.condition << "\n");
+                if (bbs_in_scc.count(ct.target->getHeaderBlock()) == 0) {
+                    DEBUG(std::cout << "Jump out of loop on " 
+                            << *ct.condition << "\n");
                     assert(ct.combined_condition);
                     jumps_out_of_loop_condition.push_back(ct.combined_condition);
                 }
             }
         }
-
+            
         if (!jumps_out_of_loop_condition.empty())
         {
             Value* possibly_jumping_out = foldr(jumps_out_of_loop_condition, 
                     BinaryOperator::Or,
                     check_if_jump_out_is_possible);
-
-            BranchInst::Create(merge_out_values, branch_back, possibly_jumping_out,
-                    check_if_jump_out_is_possible);
+        
+            new BranchInst(merge_out_values, branch_back, possibly_jumping_out,
+                           check_if_jump_out_is_possible);
         }
         else
         {
-            BranchInst::Create(branch_back, check_if_jump_out_is_possible);
+            new BranchInst(branch_back, check_if_jump_out_is_possible);
         }
-
-
+            
+            
     }
-
-
-
+    
+    
+    
     // For all values set in the loop, and possible used outside the loop,
     // we need to merge value ranges for all iterations on which we can possible
     // jump out.
@@ -1096,42 +1075,42 @@ LinearizePass::processLoopingInterval(const Interval& current,
         // First, add 'first_iteration' variable at the header block,
         // so that it's possible to find out if we need to merge new values, or
         // just copy it.
-        PHINode* first_iteration = PHINode::Create(Type::getInt1Ty(F.getContext()), "first_iteration", 
-                first_basic_block[header]->begin());
+        PHINode* first_iteration = new PHINode(Type::BoolTy, "first_iteration", 
+                                               first_basic_block[header]->begin());
         // 'imm' is bogus here, will be fixed when processing higher-level partition.
         // FIXME: Don't remember how that 'fixup' will happen.
-        first_iteration->addIncoming(ConstantInt::getTrue(F.getContext()), branch_back); 
-        first_iteration->addIncoming(ConstantInt::getFalse(F.getContext()), branch_back);
-
+        first_iteration->addIncoming(ConstantBool::get(true), branch_back); 
+        first_iteration->addIncoming(ConstantBool::get(false), branch_back);
+        
         set<Value*> live_at_loop_exit;
         find_live_vars_v(intervals_in_scc, live_at_loop_exit);
-
-
+        
+        
         set<Value*>::iterator i = live_at_loop_exit.begin(), e = live_at_loop_exit.end();
-
+        
         for(; i != e; ++i)
         {
             // Create global alloca for this value, to avoid messing with PHI nodes.
-
+            
             Instruction* allocated = new AllocaInst((*i)->getType(), 0, (*i)->getName() + "_alloca",
                     F.begin()->getTerminator());
-
-
-
+            
+                      
+            
             // Load the merged value after the loop.
-
+            
             Instruction* load = new LoadInst(allocated, (*i)->getName() + "_reloaded", 
-                    load_out_values->getTerminator());
-
+                                       load_out_values->getTerminator());
+            
             // Replace all uses of *i outside loop with uses of the reloaded variable.
-
+            
             set<BasicBlock*> bbs;
             find_bbs_v(intervals_in_scc, bbs);
             bbs.insert(extra_bbs[&current].begin(), extra_bbs[&current].end());
-
+            
             set<Value*> dummy;
             replaceSomeUsers(*i, load, bbs, dummy);
-
+            
             // It looks like live vars determination is not exactly correct. Cleanup
             // unused loads.
             if (load->getNumUses() == 0)
@@ -1144,21 +1123,17 @@ LinearizePass::processLoopingInterval(const Interval& current,
                 // There are some uses after all.
                 // Add a call to merge the new value with out value on each
                 // iterator.
-                if ((*i)->getType() == Type::getInt32Ty(F.getContext()))
+                if ((*i)->getType() == Type::IntTy)
                 {
                     vector<Value*> params;
                     params.push_back(allocated);
                     params.push_back(*i);
                     params.push_back(first_iteration);
-
+                    
                     Instruction* inst = dyn_cast<Instruction>(*i);
                     assert(inst);
-
-                    CallInst::Create<vector<Value*>::iterator>(
-                            m_merge_out_func,
-                            params.begin(),
-                            params.end(),
-                            "", merge_out_values->getTerminator());
+            
+                    new CallInst(m_merge_out_func, params, "", merge_out_values->getTerminator());
                 }
                 else
                 {
@@ -1168,23 +1143,23 @@ LinearizePass::processLoopingInterval(const Interval& current,
                     allocated->eraseFromParent();
                 }
             }
-
-
+            
+            
         }
     }
-
+    
     convertPHINodes(current);
 
-
-
+    
+    
 #if 0    
+    
+    
+
+    
 
 
-
-
-
-
-
+    
 
     BasicBlock* gb = next_gate_block[last_in_scc];
 
@@ -1196,22 +1171,22 @@ LinearizePass::processLoopingInterval(const Interval& current,
     assert(execution_condition.count(header));
     vector<Value*> ex = execution_condition[header];
     Value* final_condition = ex[0];
-
+    
     for(unsigned i = 1; i < ex.size(); ++i)
     {
         final_condition = BinaryOperator::create(
-                BinaryOperator::Or,
-                final_condition,
-                ex[i],
-                "", imm);
+            BinaryOperator::Or,
+            final_condition,
+            ex[i],
+            "", imm);
     }               
     gate[header] = final_condition;
 
     last_basic_block[last_in_scc]->getTerminator()->eraseFromParent();
 
     new BranchInst(first_basic_block[header], 
-            gb,
-            final_condition, imm);
+                   gb,
+                   final_condition, imm);
 
     set<BasicBlock*> bbs;
     find_bbs(&current, bbs);
@@ -1230,8 +1205,8 @@ LinearizePass::processLoopingInterval(const Interval& current,
             BasicBlock* b = phi->getIncomingBlock(i);
             if (bbs.count(b))
             {
-                //DEBUG(std::;//errs() << "Incoming phi node from self " 
-                << phi->getIncomingValue(i) << "\n");
+                DEBUG(std::cout << "Incoming phi node from self " 
+                      << phi->getIncomingValue(i) << "\n");
                 internal_values.push_back(phi->getIncomingValue(i));
                 internal_preds.push_back(i);
             }            
@@ -1249,7 +1224,7 @@ LinearizePass::processLoopingInterval(const Interval& current,
     // Create a new phi node that will evaluate to 'true' on first execution, 
     // and to 'false' on subsequent ones.
     PHINode* first_iteration = new PHINode(Type::BoolTy, "first_iteration", 
-            first_basic_block[header]->begin());
+                                           first_basic_block[header]->begin());
     // 'imm' is bogus here, will be fixed when processing higher-level partition.
     first_iteration->addIncoming(ConstantBool::get(true), imm); 
     first_iteration->addIncoming(ConstantBool::get(false), imm); 
@@ -1284,9 +1259,9 @@ LinearizePass::processLoopingInterval(const Interval& current,
     vector<Value*> jumps_out_of_loop_condition;
     BOOST_FOREACH(const Interval* I, intervals_in_scc) {
         BOOST_FOREACH(const control_transfer_data& ct, control_transfers[I]) {
-            if (bbs_in_scc.count(ct.target->getHeaderNode()) == 0) {
-                //DEBUG(std::;//errs() << "Jump out of loop on " 
-                << *ct.condition << "\n");
+            if (bbs_in_scc.count(ct.target->getHeaderBlock()) == 0) {
+                DEBUG(std::cout << "Jump out of loop on " 
+                      << *ct.condition << "\n");
                 assert(ct.combined_condition);
                 jumps_out_of_loop_condition.push_back(ct.combined_condition);
             }
@@ -1294,7 +1269,7 @@ LinearizePass::processLoopingInterval(const Interval& current,
     }
 
     BasicBlock* imm2 = new BasicBlock("maybe_merge_out_values", &F, imm);
-
+    
     // If there jump to gate block of the first block outside SCC, replace
     // them with jumps to meybe_merge_out_values block.
     BasicBlock* gate_of_last_in_scc = gate_block[last_in_scc];
@@ -1314,22 +1289,22 @@ LinearizePass::processLoopingInterval(const Interval& current,
         }
     }
     // Move 'merge_bypassed' phis from the next gate block to 'maybe_merge_out_values'
-    /*    {
-          while(isa<PHINode>(&gate_of_first_outside->front()))
-          {
-          Instruction* first = gate_of_first_outside->begin();
-          Instruction* IB = gate_of_last_in_scc->getFirstNonPHI();
-          first->moveBefore(IB);
-
-          }
-
-          }*/
-
-
-
+/*    {
+        while(isa<PHINode>(&gate_of_first_outside->front()))
+        {
+            Instruction* first = gate_of_first_outside->begin();
+            Instruction* IB = gate_of_last_in_scc->getFirstNonPHI();
+            first->moveBefore(IB);
+            
+        }
+        
+    }*/
+    
+    
+    
     Value* possibly_jumping_out = foldr(jumps_out_of_loop_condition, 
-            BinaryOperator::Or,
-            imm2);
+                                        BinaryOperator::Or,
+                                        imm2);
     BasicBlock* imm3 = new BasicBlock("really_merge_out_values", &F, imm);
     new BranchInst(imm3, imm, possibly_jumping_out, imm2);
     new BranchInst(imm, imm3);
@@ -1341,7 +1316,7 @@ LinearizePass::processLoopingInterval(const Interval& current,
 
     Instruction* imm3_term = imm3->getTerminator();
     Instruction* imm_first= imm->begin();
-
+    
 
     set<Value*> inserted;
     BOOST_FOREACH(Value* live, live_at_loop_exit) {
@@ -1350,16 +1325,16 @@ LinearizePass::processLoopingInterval(const Interval& current,
             continue;
 
         PHINode* out_top = new PHINode(live->getType(), live->getName() + ".out_top", 
-                first);
+                                 first);
 
         vector<Value*> args;
         args += live, out_top, first_iteration;
         Value* out_m = new CallInst(m_merge_out_func, args, 
-                live->getName() + ".out_m",
-                imm3_term);                                            
+                                    live->getName() + ".out_m",
+                                    imm3_term);                                            
 
         PHINode* out = new PHINode(live->getType(), live->getName() + ".out",
-                imm_first);
+                                   imm_first);
         out->addIncoming(out_top, imm2);
         out->addIncoming(out_m, imm3);
 
@@ -1377,22 +1352,20 @@ LinearizePass::processLoopingInterval(const Interval& current,
         replaceSomeUsers(live, out, bbs_in_scc, inserted);
     }
 #endif
-
+          
     // SET FIRST AND LAST BASIC BLOCKS
-
-    //TODO.unfold: return underlying
-    //first_basic_block[&current] = first_basic_block[current.getHeaderNode()];
-
+    first_basic_block[&current] = first_basic_block[current.getHeaderNode()];
+    
     // last basic block is set in createGates
-
+    
     //last_basic_block[&current] = next_gate_block[current.Nodes.back()];    
 }
 
 
-    void 
+void 
 LinearizePass::processPartition(const IntervalPartition& P, Function& F)
 {
-    ;//errs() << "Partition has " << P.getIntervals().size() << " intervals\n";
+    cout << "Partition has " << P.getIntervals().size() << " intervals\n";
     current_partition = &P;
 
     const std::vector<Interval*>& I = P.getIntervals();
@@ -1400,20 +1373,20 @@ LinearizePass::processPartition(const IntervalPartition& P, Function& F)
     {
         Interval* current = I[i];
 
-        //        ;//errs() << "Interval is\n";
-        //        current->print(;//errs());
+//        cout << "Interval is\n";
+//        current->print(cout);
 
         set<Interval*> scc;
         bool has_scc = find_scc(*current, scc);
 
-
+    
         if (has_scc)
-            ;//errs() << "SCC FOUND\n";
+            cout << "SCC FOUND\n";
         else
-            ;//errs() << "NO SCCS\n";
+            cout << "NO SCCS\n";
 
 
-
+        
         if (has_scc) {
 
             processLoopingInterval(*current, &scc, F);
@@ -1430,14 +1403,8 @@ LinearizePass::processPartition(const IntervalPartition& P, Function& F)
 
 void LinearizePass::init_control_transfer_data(const IntervalPartition& PP)
 {
-    /* TODO: lookup whether there is analogue of zero_order
-     * now present
-     */
-    /*
-       assert(PP.zero_order);
-       const IntervalPartition& P = *(PP.zero_order);
-       */
-    const IntervalPartition & P = PP;
+    assert(PP.zero_order);
+    const IntervalPartition& P = *(PP.zero_order);
 
     map<BasicBlock*, Interval*> bb2int;
     for(unsigned i = 0, e = P.getIntervals().size(); i != e; ++i)
@@ -1445,10 +1412,10 @@ void LinearizePass::init_control_transfer_data(const IntervalPartition& PP)
         Interval* Int = P.getIntervals()[i];
         assert(Int->Nodes.empty());
 
-        bb2int[Int->getHeaderNode()] = Int;
+        bb2int[Int->getHeaderBlock()] = Int;
 
-        first_basic_block[Int] = Int->getHeaderNode();
-        last_basic_block[Int] = Int->getHeaderNode();        
+        first_basic_block[Int] = Int->getHeaderBlock();
+        last_basic_block[Int] = Int->getHeaderBlock();        
     }
 
     for(unsigned i = 0, e = P.getIntervals().size(); i != e; ++i)
@@ -1456,7 +1423,7 @@ void LinearizePass::init_control_transfer_data(const IntervalPartition& PP)
         Interval* Int = P.getIntervals()[i];
         assert(Int->Nodes.empty());
 
-        BasicBlock* bb = Int->getHeaderNode();
+        BasicBlock* bb = Int->getHeaderBlock();
 
         TerminatorInst* term = bb->getTerminator();
 
@@ -1467,30 +1434,30 @@ void LinearizePass::init_control_transfer_data(const IntervalPartition& PP)
             if (b->isConditional())
             {
                 control_transfer_data d1 = {bb,
-                    bb2int[b->getSuccessor(0)],
-                    b->getCondition()};
+                                            bb2int[b->getSuccessor(0)],
+                                            b->getCondition()};
                 control_transfers[Int].push_back(d1);
 
                 // Negate the branch condition.
-                Value* inverted = BinaryOperator::Create(
-                        BinaryOperator::Xor, b->getCondition(), 
-                        ConstantInt::getTrue(bb->getContext()), "", term);
+                Value* inverted = BinaryOperator::create(
+                    BinaryOperator::Xor, b->getCondition(), 
+                    ConstantBool::get(true), "", term);
 
                 control_transfer_data d2 = {bb,
-                    bb2int[b->getSuccessor(1)],
-                    inverted};
+                                            bb2int[b->getSuccessor(1)],
+                                            inverted};
                 control_transfers[Int].push_back(d2);
             }
             else
             {
                 control_transfer_data d = {bb,
-                    bb2int[b->getSuccessor(0)], 
-                    ConstantInt::getTrue(bb->getContext())};
+                                           bb2int[b->getSuccessor(0)], 
+                                           ConstantBool::get(true)};
                 control_transfers[Int].push_back(d);                                           
             }
 
             term->removeFromParent();
-            //delete term;
+            delete term;
         }
 
     }
@@ -1499,32 +1466,28 @@ void LinearizePass::init_control_transfer_data(const IntervalPartition& PP)
 
 bool LinearizePass::runOnFunction(Function& f)
 {    
-    //errs() << "Processing function " << f.getName() << "\n";
-
+    cout << "Processing function " << f.getName() << "\n";
+    
     current_function_ = &f;
-
-    Module * parent = f.getParent();
-
-    LLVMContext & context = f.getContext();
-
+    
+    
     vector<const Type*> params;
-    params.push_back(Type::getInt32Ty(context));
-    FunctionType* ft = FunctionType::get(Type::getInt32Ty(context), params, true);                                         
-
-    /* Strange merge stub, avoiding const_cast */
-    parent->getOrInsertFunction ("merge_values", ft);
-    m_merge_func = parent->getFunction("merge_values");
+    params.push_back(Type::IntTy);
+    FunctionType* ft = FunctionType::get(Type::IntTy, params, true);                                         
+    m_merge_func = f.getParent()->getOrInsertFunction ("merge_values", ft);
 
 
-    parent->getOrInsertFunction(
-            "merge_out_value",
-            Type::getVoidTy(context),
-            PointerType::getUnqual(Type::getInt32Ty(context)),
-            Type::getInt32Ty(context),
-            Type::getInt1Ty(context), 
-            0);
+    m_merge_out_func = f.getParent()->getOrInsertFunction(
+        "merge_out_value",
+        Type::VoidTy,
+        PointerType::get(Type::IntTy),
+        Type::IntTy,
+        Type::BoolTy, 
+        0);
+  
 
-    m_merge_out_func = parent->getFunction("merge_out_value"); 
+
+    
 
 #if 0
     BasicBlock* single_return = 0;
@@ -1543,14 +1506,14 @@ bool LinearizePass::runOnFunction(Function& f)
 
     IntervalPartition& Intervals = getAnalysis<IntervalPartition>();
 
-    //    Intervals->print(errs());
+    Intervals.zero_order->print(cout);
     init_control_transfer_data(Intervals);
 
     bool reducible = true;
     vector<IntervalPartition*> tmp;
     tmp.push_back(&Intervals);
     for(IntervalPartition* current = &Intervals; 
-            !current->isDegeneratePartition();)
+        !current->isDegeneratePartition();)
     {
         IntervalPartition* next = new IntervalPartition(*current, false);
         tmp.push_back(next);
@@ -1566,24 +1529,25 @@ bool LinearizePass::runOnFunction(Function& f)
 
     for(unsigned i = 0, e = tmp.size(); i != e; ++i)
     {
-        ;//errs() << (i+1) << "-order partition\n";        
+        cout << (i+1) << "-order partition\n";        
         processPartition(*tmp[i], f);
-        ;//errs() << "Code now " << f << endl;
+        cout << "Code now " << f << endl;
     }
-
+    
+    cout << flush;
 
 
     assert(reducible);
 
-    //    ;//errs() << f << "\n";
+//    cout << f << "\n";
 
-
+    
 
 
 #if 0
     // We should have a single path though the function now.
     // Convert PHI nodes into value range merges.
-
+    
     //Value* merge_function = M.getOrInsertFunction(
     //    "lvk.wcet.merge_time_estimation", pvoid, pvoid, Type::UIntTy, 0);
     vector<Instruction*> phis;
@@ -1599,9 +1563,9 @@ bool LinearizePass::runOnFunction(Function& f)
     }
 #endif        
 
+    
 
-
-
+      
 
 #if 0
     // For all basic blocks.
@@ -1614,21 +1578,21 @@ bool LinearizePass::runOnFunction(Function& f)
             {
                 if (branch->isConditional())
                 {
-                    ;//errs() << "Branch " << *branch << "\n";
+                    cout << "Branch " << *branch << "\n";
                     // Get dominance frontiers for both branch targets.                    
                     const std::set<BasicBlock*>& df1 = DF.find(
-                            branch->getSuccessor(0))->second;
+                        branch->getSuccessor(0))->second;
                     const std::set<BasicBlock*>& df2 = DF.find(
-                            branch->getSuccessor(1))->second;
+                        branch->getSuccessor(1))->second;
 
                     if (df1.size() == 1 && df2.size() == 1 && 
-                            *df1.begin() == *df2.begin())
-                        ;//errs() << "Merge point: " << *df1.begin() << "\n";
+                        *df1.begin() == *df2.begin())
+                        cout << "Merge point: " << *df1.begin() << "\n";
                     else
-                        ;//errs() << "No merge point detected\n";
+                        cout << "No merge point detected\n";
                 }
             }
-
+            
         }
     }
 

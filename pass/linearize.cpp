@@ -95,8 +95,17 @@ namespace {
         bool findScc(const Interval &, set<BasicBlock *> &);
         void processPartition(const IntervalPartition &, Function &);
         void processNonLoopingInterval(const Interval &, Function &);
-        void processLoopingInterval(const Interval &, set<BasicBlock *> *,
-                Function &);
+        void processLoopingInterval(const Interval &, set<BasicBlock *> *, Function &);
+        void processLowerInterval(const Interval &, const Interval &, bool mergeBypassed = true);
+        void createGates(const Interval &, Function &,
+                set<BasicBlock *> * scc = 0 );
+
+        map<const Interval *, bool> looping;
+
+        map<const Interval *, vector<Value *> > executionCondition;
+        map<const Interval *, Value *> gate;
+        map<const Interval *, BasicBlock *> gateBlock;
+        map<const Interval *, BasicBlock *> nextGateBlock;
     public:
         static char ID;
         LinearizePass(): FunctionPass(ID) {}
@@ -168,7 +177,6 @@ bool LinearizePass::runOnFunction(Function & f) {
     return true;
 }
 
-/* TODO: incomplete function */
 bool LinearizePass::findScc(const Interval& I, set<BasicBlock *>& scc) { 
     BasicBlock * header = I.getHeaderNode();
 
@@ -202,12 +210,36 @@ bool LinearizePass::findScc(const Interval& I, set<BasicBlock *>& scc) {
 /* TODO: incomplete function */
 void LinearizePass::processLoopingInterval(const Interval & current,
         set<BasicBlock *> * scc, Function & f) {
+    BasicBlock * header = current.getHeaderNode();
 
+    looping[& current] = true;
+
+    executionCondition.clear();
+    gate.clear();
+    gateBlock.clear();
+    nextGateBlock.clear();
+
+    createGates(current, f, scc);
+
+    for (int i = 0; i < current.Nodes.size(); i++) {
+        processLowerInterval(*(current.Nodes[i]), current);
+    }
 }
 
 /* TODO: incomplete function */
 void LinearizePass::processNonLoopingInterval(const Interval & current,
         Function & f) {
+
+}
+
+/* TODO: incomplete function */
+void LinearizePass::createGates(const Interval& current, Function& f,
+        set<BasicBlock *> * scc) {
+
+}
+
+/* TODO: incomplete function */
+void LinearizePass::processLowerInterval(const Interval & lower, const Interval & current, bool mergeBypassed) {
 
 }
 
