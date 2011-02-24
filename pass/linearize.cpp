@@ -507,7 +507,24 @@ void LinearizePass::processLoopingInterval(const Interval & current,
 /* TODO: incomplete function */
 void LinearizePass::processNonLoopingInterval(const Interval & current,
         Function & f) {
+    executionCondition.clear();
+    gate.clear();
+    gateBlock.clear();
+    nextGateBlock.clear();
 
+    createGates(current, f);
+
+    /* 1. Add real gate condition and phi nodes for all intervals */
+    for (int i = 0; i < current.Nodes.size(); i++) {
+        processLowerInterval(*current.Nodes[i], current);
+    }
+
+    /* 2. Convert PHI nodes to calls to merge function */
+    convertPHINodes(current);
+
+    /* 3. Set first basic block */
+    /* Seems strange? Compatibility issue! */
+    firstBasicBlock[current.getHeaderNode()] = current.getHeaderNode(); 
 }
 
 /* TODO: incomplete function */
