@@ -90,9 +90,16 @@ namespace {
         Function * mergeOutFunction;
         Function * currentFunction;
 
+        map<const BasicBlock *, vector<control_transfer_data> > controlTransfers;
+        map<const BasicBlock *, BasicBlock *> firstBasicBlock;
+        map<const BasicBlock *, BasicBlock *> lastBasicBlock;
+
         const IntervalPartition* currentPartition;
 
         bool findScc(const Interval &, set<BasicBlock *> &);
+        void findBbsV(const vector<BasicBlock *> &, set<BasicBlock *> &);
+        void findLiveVarsV(const vector<BasicBlock *> &, set<Value *> &);
+
         void processPartition(const IntervalPartition &, Function &);
         void processNonLoopingInterval(const Interval &, Function &);
         void processLoopingInterval(const Interval &, set<BasicBlock *> *, Function &);
@@ -100,12 +107,20 @@ namespace {
         void createGates(const Interval &, Function &,
                 set<BasicBlock *> * scc = 0 );
 
+        Value * foldr(const vector<Value *>&, Instruction::BinaryOps, BasicBlock *);
+
+        void replaceSomeUsers(Value * form, Value * to,
+                const set<BasicBlock *> &, const set<Value *> &);
+
+        void convertPHINodes(const Interval & current);
+
+        map<const Interval *, set<BasicBlock *> > extraBbs;
         map<const Interval *, bool> looping;
 
-        map<const Interval *, vector<Value *> > executionCondition;
-        map<const Interval *, Value *> gate;
-        map<const Interval *, BasicBlock *> gateBlock;
-        map<const Interval *, BasicBlock *> nextGateBlock;
+        map<const BasicBlock *, vector<Value *> > executionCondition;
+        map<const BasicBlock *, Value *> gate;
+        map<const BasicBlock *, BasicBlock *> gateBlock;
+        map<const BasicBlock *, BasicBlock *> nextGateBlock;
     public:
         static char ID;
         LinearizePass(): FunctionPass(ID) {}
@@ -207,7 +222,19 @@ bool LinearizePass::findScc(const Interval& I, set<BasicBlock *>& scc) {
     return hasBackEdges;
 }
 
+Value * LinearizePass::foldr(const vector<Value *> & values, Instruction::BinaryOps op, BasicBlock * parent) {
+    Value * result = values[0];
+    for (int i = 1; i < values.size(); i++) {
+        result = BinaryOperator::Create(op, result, values[i], "", parent);
+    }
+    return result;
+}
+
 /* TODO: incomplete function */
+void LinearizePass::convertPHINodes(const Interval & current) {
+
+}
+
 void LinearizePass::processLoopingInterval(const Interval & current,
         set<BasicBlock *> * scc, Function & f) {
     BasicBlock * header = current.getHeaderNode();
@@ -224,11 +251,269 @@ void LinearizePass::processLoopingInterval(const Interval & current,
     for (int i = 0; i < current.Nodes.size(); i++) { 
         processLowerInterval(*(current.Nodes[i]), current);
     }
+
+    /* Compute some information about scc */
+    /* WARNING: this patch is meant to be used with BasicBlocks
+     * although in old version it works with Intervals
+     * TODO: Check semantics
+     */ 
+
+    BasicBlock * lastInScc = 0;
+    BasicBlock * firstOutsideScc = 0;
+    vector<BasicBlock *> blocksInScc;
+    vector<BasicBlock *> blocksOutsideScc;
+
+    for (int i = 0; i < current.Nodes.size(); i++) {
+        if (scc->count(current.Nodes[i])) {
+            lastInScc = current.Nodes[i];
+            blocksInScc.push_back(current.Nodes[i]);
+        } else {
+            if (! firstOutsideScc) 
+                firstOutsideScc = current.Nodes[i];
+            blocksOutsideScc.push_back(current.Nodes[i]);
+        }
+    }
+
+    /* Resolving basic block, that causes loop iteration */
+
+    /* Merging bypassed values from loop body 
+     * Resolving al PHI's from next gate to loop
+     */
+
+    LLVMContext & currentContext = f.getContext();
+
+    BasicBlock* firstGateOutside = gateBlock[firstOutsideScc];
+    
+    BasicBlock * mergeValuesBypassedInLastInterval = BasicBlock::Create(
+            currentContext, "mergeValuesBypassedInLastInterval",
+            &f, firstGateOutside);
+    extraBbs[&current].insert(mergeValuesBypassedInLastInterval);
+
+    BasicBlock * checkIfJumpOutIsPossible = BasicBlock::Create(
+            currentContext, "checkIfJumpOutIsPossible",
+            &f, firstGateOutside);
+    extraBbs[&current].insert(checkIfJumpOutIsPossible);
+
+    BasicBlock * mergeOutValues = BasicBlock::Create(
+            currentContext, "mergeOutValues",
+            &f, firstGateOutside);
+    extraBbs[&current].insert(mergeOutValues);
+
+    BasicBlock * branchBack = BasicBlock::Create(
+            currentContext, "branchBack", &f, firstGateOutside);
+    extraBbs[&current].insert(branchBack);
+
+    BasicBlock * loadOutValues = BasicBlock::Create(
+            currentContext, "loadOutValues", &f, firstGateOutside);
+    extraBbs[&current].insert(loadOutValues);
+
+    BranchInst::Create(branchBack, mergeOutValues);
+    BranchInst::Create(checkIfJumpOutIsPossible,
+             mergeValuesBypassedInLastInterval); 
+
+    if (firstOutsideScc)
+        BranchInst::Create(gateBlock[firstOutsideScc], loadOutValues);
+    else
+        BranchInst::Create(lastBasicBlock[current.getHeaderNode()], loadOutValues);
+
+    /* Replacing jumps in last gate and interval
+     * to mergeValuesBypasseedInLastInterval
+     */
+    gateBlock[lastInScc]->getTerminator()->replaceUsesOfWith(
+            firstGateOutside, mergeValuesBypassedInLastInterval);
+    lastBasicBlock[lastInScc]->getTerminator()->replaceUsesOfWith(
+            firstGateOutside, mergeValuesBypassedInLastInterval);
+
+    while(true) {
+        if (! firstGateOutside) break;
+
+        PHINode * phi = dyn_cast<PHINode>(&(firstGateOutside->front()));
+        if (! phi) break;
+
+        phi->moveBefore(mergeValuesBypassedInLastInterval->getTerminator());
+
+    }
+
+    set<BasicBlock *> bbsInScc;
+    findBbsV(blocksInScc, bbsInScc);
+
+    /* Fix PHI nosed at entry block. We have to dereference
+     * values from the loop to the ''branchBack
+     */
+
+    {
+        BasicBlock * first = firstBasicBlock[current.getHeaderNode()];
+        BasicBlock::iterator i = first->begin(), e=first->end();
+
+        for(;i != e; i++) {
+            PHINode * phi = dyn_cast<PHINode>(i);
+            if (! phi) break;
+            int jumpsFromInside = 0;
+            for(int j = 0; j < phi->getNumIncomingValues(); j++) {
+                if (bbsInScc.count(phi->getIncomingBlock(j)))
+                   jumpsFromInside; 
+            }
+
+            if (jumpsFromInside == 1) {
+                for (int j = 0; j < phi->getNumIncomingValues(); j++) {
+                    if (bbsInScc.count(phi->getIncomingBlock(j)))
+                        phi->setIncomingBlock(j, branchBack);
+                }
+            } else if (jumpsFromInside > 1) {
+                /* Processing merge values for loop branch block
+                 */
+
+                PHINode * mergeFromLoop = PHINode::Create(
+                       phi->getType(), "", branchBack);
+
+                for (int j = 0; j < phi->getNumIncomingValues();) {
+                    if (bbsInScc.count(phi->getIncomingBlock(j))) {
+                        mergeFromLoop->addIncoming(phi->getIncomingValue(j),
+                                phi->getIncomingBlock(j));
+
+                        /* Removal will shift index */
+                        phi->removeIncomingValue(j);
+                    } else {
+                        j++;
+                    }
+                }
+                phi->addIncoming(mergeFromLoop, branchBack);
+            }
+
+            /* Locating loop iterator. ADd branch back to header subject
+             * upon that condition
+             */
+
+            /* Create the back branch to loop header */
+            {
+                BasicBlock * header = current.getHeaderNode();
+                assert(executionCondition.count(header));
+                vector<Value *> ex = executionCondition[header];
+                Value * finalCondition = ex[0];
+
+                for(int i = 1; i < ex.size(); i++) {
+                    finalCondition = BinaryOperator::Create(
+                            BinaryOperator::Or, finalCondition,
+                            ex[i], "", branchBack);
+                }
+                gate[header] = finalCondition;
+
+                BranchInst::Create(firstBasicBlock[header],
+                        loadOutValues, finalCondition, branchBack);
+            }
+
+            /* First expression deciding to jump out of the loop */
+            {
+                vector<Value *> jumpsOutOfLoopCondition;
+                for (vector<BasicBlock *>::iterator b = blocksInScc.begin(),
+                        e = blocksInScc.end(); b != e; b++) {
+                    for (vector<control_transfer_data>::iterator ct = controlTransfers[*b].begin(),
+                            ctb = controlTransfers[*b].end(); ct != ctb; ct++) {
+                        if (bbsInScc.count((*ct).target->getHeaderNode()) == 0) {
+                            outs() << "Jump out of loop on "
+                                << ((*ct).condition) << "\n";
+                            assert((*ct).combined_condition);
+                            jumpsOutOfLoopCondition.push_back((*ct).combined_condition);
+                        
+                        }
+                    }
+                }
+
+                if (! jumpsOutOfLoopCondition.empty()) {
+                    Value * possiblyJumpingOut = foldr(jumpsOutOfLoopCondition,
+                            BinaryOperator::Or, checkIfJumpOutIsPossible);
+                    BranchInst::Create(mergeOutValues, branchBack,
+                            possiblyJumpingOut, checkIfJumpOutIsPossible);
+                } else {
+                    BranchInst::Create(branchBack, checkIfJumpOutIsPossible);
+                }
+            }
+
+            /* Merging values range for all iterations we may jump out of */
+
+            {
+                /* Adding 'firstIteration' variable at the header block
+                 * to find out if we need to merge new values */
+
+                PHINode * firstIteration = PHINode::Create(
+                        Type::getInt1Ty(currentContext),
+                        "firstIteration", firstBasicBlock[header]->begin());
+                
+                firstIteration->addIncoming(ConstantInt::getTrue(currentContext),
+                        branchBack);
+                firstIteration->addIncoming(ConstantInt::getFalse(currentContext), 
+                        branchBack);
+
+                set<Value *> liveAtLoopExit;
+                findLiveVarsV(blocksInScc, liveAtLoopExit);
+
+                set<Value *>::iterator i = liveAtLoopExit.begin(),
+                    e = liveAtLoopExit.end();
+
+                for (; i != e; i++) {
+                    /* Create gloval allocation to avoid phi messing */
+                    Instruction * allocated = new AllocaInst((*i)->getType(), 0,
+                            (*i)->getName() + "_alloca", f.begin()->getTerminator());
+
+                    /* Load merged values */
+                    Instruction * load = new LoadInst(allocated, (*i)->getName() + "_reload",
+                            loadOutValues->getTerminator());
+
+                    /* Replace all uses of source variable with 
+                     * reloaded variable */
+                    set<BasicBlock *> bbs;
+                    findBbsV(blocksInScc, bbs);
+                    bbs.insert(extraBbs[&current].begin(), extraBbs[&current].end());
+
+                    set<Value *> dummy;
+                    replaceSomeUsers(*i, load, bbs, dummy);
+
+                    /* Compatibility cleanup */
+                    if (load->getNumUses() == 0) {
+                        load->eraseFromParent();
+                        allocated->eraseFromParent(); 
+                    } else {
+                        /* Adding call to merge with out value */
+                        if ((*i)->getType() == Type::getInt32Ty(currentContext)) {
+                            vector<Value *> params;
+                            params.push_back(allocated);
+                            params.push_back(*i);
+                            params.push_back(firstIteration);
+
+                            Instruction * inst = dyn_cast<Instruction>(*i);
+                            assert(inst);
+
+                            CallInst::Create<vector<Value *>::iterator>(mergeOutFunction,
+                                    params.begin(), params.end(), "",
+                                    mergeOutValues->getTerminator());
+                        } else {
+                            /* noninterger uses are terminated and undefined */
+                            load->replaceAllUsesWith(UndefValue::get((*i)->getType()));
+                            load->eraseFromParent();
+                            allocated->eraseFromParent();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    convertPHINodes(current);
+
+    /* Seems weird? Compatibility issue! */
+    firstBasicBlock[current.getHeaderNode()] = current.getHeaderNode();
+
 }
 
 /* TODO: incomplete function */
 void LinearizePass::processNonLoopingInterval(const Interval & current,
         Function & f) {
+
+}
+
+/* TODO: incomplete function */
+void LinearizePass::replaceSomeUsers(Value * from, Value * to,
+        const set<BasicBlock *> & restrictedBlocks,
+        const set<Value *> & restrictedUsers) {
 
 }
 
@@ -240,6 +525,18 @@ void LinearizePass::createGates(const Interval& current, Function& f,
 
 /* TODO: incomplete function */
 void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interval & current, bool mergeBypassed) {
+
+}
+
+/* TODO: incomplete function */
+void LinearizePass::findBbsV(const vector<BasicBlock *>& b,
+        set<BasicBlock *> & result) {
+
+}
+
+/* TODO: incomplete function */
+void LinearizePass::findLiveVarsV(const vector<BasicBlock *>& b,
+        set<Value *> & result) {
 
 }
 
