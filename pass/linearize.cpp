@@ -546,10 +546,61 @@ void LinearizePass::replaceSomeUsers(Value * from, Value * to,
 
 }
 
-/* TODO: incomplete function */
 void LinearizePass::createGates(const Interval& current, Function& f,
         set<BasicBlock *> * scc) {
+    /* Create basic block that will enclose interval */
+    BasicBlock * intervalEnd;
+    {
+        BasicBlock * last = lastBasicBlock[current.Nodes.back()];
+        intervalEnd = BasicBlock::Create(f.getContext(), "intervalFinish", &f);
 
+        /* Removing intervals with return and 
+         * adding jump to them */
+        bool seenReturn = false;
+        for(int i = 0; i < current.Nodes.size(); i++) {
+            BasicBlock * last = lastBasicBlock[current.Nodes[i]];
+            Instruction * term = last->getTerminator();
+            if (term && isa<ReturnInst>(term)) {
+                /* Single exit basic block for all function */
+                assert(! seenReturn);
+                seenReturn = true;
+                term->removeFromParent();
+                intervalEnd->getInstList().push_back(term);
+                assert(term->getParent() == intervalEnd);
+            }
+        }
+    }
+    vector<BasicBlock *> nodes;
+    if (scc) {
+        /* Processing intervals in scc */
+        assert(scc->count(current.Nodes[0]));
+        for(int i = 0; i < current.Nodes.size(); i++) {
+            if (scc->count(current.Nodes[i]) != 0)
+                nodes.push_back(current.Nodes[i]);
+        }
+        for(int i = 0; i < current.Nodes.size(); i++) {
+            if (scc->count(current.Nodes[i]) == 0)
+                nodes.push_back(current.Nodes[i]);
+        }
+    } else {
+        nodes.assign(current.Nodes.begin(), current.Nodes.end());
+    }
+
+    /* Creating gate blocks for intervals other than first */
+    /* Seems strange to build gates for BasicBlocks
+     * TODO: check semantics */
+
+    for(int i = 1; i < nodes.size(); i++) {
+        BasicBlock * pseudo = nodes[i];
+        BasicBlock * gb = BasicBlock::Create(f.getContext(), "gate",
+                &f, firstBasicBlock[pseudo]);
+        extraBbs[&current].insert(gb);
+        gateBlock[pseudo] = gb;
+        nextGateBlock[nodes[i-1]] = gb;
+    }
+
+    nextGateBlock[nodes.back()] = intervalEnd;
+    lastBasicBlock[current.getHeaderNode()] = intervalEnd;
 }
 
 /* TODO: incomplete function */
