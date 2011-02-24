@@ -504,7 +504,6 @@ void LinearizePass::processLoopingInterval(const Interval & current,
 
 }
 
-/* TODO: incomplete function */
 void LinearizePass::processNonLoopingInterval(const Interval & current,
         Function & f) {
     executionCondition.clear();
@@ -527,10 +526,23 @@ void LinearizePass::processNonLoopingInterval(const Interval & current,
     firstBasicBlock[current.getHeaderNode()] = current.getHeaderNode(); 
 }
 
-/* TODO: incomplete function */
 void LinearizePass::replaceSomeUsers(Value * from, Value * to,
         const set<BasicBlock *> & restrictedBlocks,
         const set<Value *> & restrictedUsers) {
+    vector<User *> users(from->use_begin(), from->use_end());
+    for(int i = 0; i < users.size(); i++) {
+        Instruction * user = cast<Instruction>(users[i]);
+        outs() << "user " << *user << "\n";
+
+        if (restrictedUsers.count(user))
+            outs() << "user " << *user << " is inside restricred users\n";
+        if (restrictedUsers.count(user->getParent()))
+            outs() << "user " << *user << " is inside restricted block\n";
+
+        if (restrictedUsers.count(user) == 0 &&
+                restrictedBlocks.count(user->getParent()) == 0)
+            user->replaceUsesOfWith(from, to);
+    }
 
 }
 
