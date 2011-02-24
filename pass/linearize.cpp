@@ -605,7 +605,45 @@ void LinearizePass::createGates(const Interval& current, Function& f,
 
 /* TODO: incomplete function */
 void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interval & current, bool mergeBypassed) {
+    outs() << "Processing interval " << & lower << " " << lower;
 
+    /* 1. Create gate Branch
+     *
+     * Merging them together with 'or' and branch
+     * them to 'lower' from gate block */
+
+    if (&lower != current.Nodes.front()) {
+        assert(executionCondition.count(& lower));
+
+        Value * finalCondition = foldr(executionCondition[&lower],
+                BinaryOperator::Or, gateBlock[&lower]);
+
+        gate[&lower] = finalCondition;
+        BranchInst::Create(firstBasicBlock[&lower], nextGateBlock[&lower],
+                finalCondition, gateBlock[&lower]);
+    }
+
+    /* 2. Propagate Execution condition
+     * We have a list of control transfers associated with this interval, and
+     * each of them has a condition -- basically an instruction that
+     * computes bool value that tells if that control transfer is possible.
+     * After gate block is created, we have something like:
+    
+     * gate:
+     *      br %something, label %int1, label %gate2
+     * int1:
+     *      %condition = ...
+     * gate2:
+     *
+     * The control transfer can be done if both the condition is true,
+     * and current interval is executed. So, we add
+     
+     *  %cond_merged = phi bool [ %condition, label %int1 ] ,
+     *                          [ false, label %gate2 ]
+     *
+     * as use 'cond_merge' as final execution condition
+    
+     */
 }
 
 /* TODO: incomplete function */
