@@ -96,7 +96,7 @@ namespace {
         void processPartition(const IntervalPartition &, Function &);
         void processNonLoopingInterval(const Interval &, Function &);
         void processLoopingInterval(const Interval &, set<BasicBlock *> *, Function &);
-        void processLowerInterval(const Interval &, const Interval &, bool mergeBypassed = true);
+        void processLowerInterval(const BasicBlock &, const Interval &, bool mergeBypassed = true);
         void createGates(const Interval &, Function &,
                 set<BasicBlock *> * scc = 0 );
 
@@ -221,7 +221,7 @@ void LinearizePass::processLoopingInterval(const Interval & current,
 
     createGates(current, f, scc);
 
-    for (int i = 0; i < current.Nodes.size(); i++) {
+    for (int i = 0; i < current.Nodes.size(); i++) { 
         processLowerInterval(*(current.Nodes[i]), current);
     }
 }
@@ -239,7 +239,7 @@ void LinearizePass::createGates(const Interval& current, Function& f,
 }
 
 /* TODO: incomplete function */
-void LinearizePass::processLowerInterval(const Interval & lower, const Interval & current, bool mergeBypassed) {
+void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interval & current, bool mergeBypassed) {
 
 }
 
