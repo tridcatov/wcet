@@ -94,13 +94,15 @@ namespace {
         map<const BasicBlock *, BasicBlock *> firstBasicBlock;
         map<const BasicBlock *, BasicBlock *> lastBasicBlock;
 
-        const IntervalPartition* currentPartition;
+        IntervalPartition* currentPartition;
 
         bool findScc(const Interval &, set<BasicBlock *> &);
+        void findBbs(const BasicBlock *, set<BasicBlock *> & result);
         void findBbsV(const vector<BasicBlock *> &, set<BasicBlock *> &);
+        void findLiveVars(const BasicBlock *, set<Value *> &);
         void findLiveVarsV(const vector<BasicBlock *> &, set<Value *> &);
 
-        void processPartition(const IntervalPartition &, Function &);
+        void processPartition(IntervalPartition &, Function &);
         void processNonLoopingInterval(const Interval &, Function &);
         void processLoopingInterval(const Interval &, set<BasicBlock *> *, Function &);
         void processLowerInterval(const BasicBlock &, const Interval &, bool mergeBypassed = true);
@@ -603,7 +605,6 @@ void LinearizePass::createGates(const Interval& current, Function& f,
     lastBasicBlock[current.getHeaderNode()] = intervalEnd;
 }
 
-/* TODO: incomplete function */
 void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interval & current, bool mergeBypassed) {
     outs() << "Processing interval " << & lower << " " << lower;
 
@@ -644,6 +645,106 @@ void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interva
      * as use 'cond_merge' as final execution condition
     
      */
+
+    set<Value *> accountedPhis;
+
+    vector<control_transfer_data> & cts = controlTransfers[&lower];
+    for (int i = 0, e = cts.size(); i != e; i++) {
+        control_transfer_data & ct = cts[i];
+
+        Value * propagatedCondition;
+        LLVMContext & context = current.getHeaderNode()->getParent()->getContext();
+
+        if (& lower != current.getHeaderNode()) {
+            BasicBlock * last = lastBasicBlock[&lower];
+            PHINode * phi = PHINode::Create(Type::getInt1Ty(context));
+            nextGateBlock[&lower]->getInstList().push_front(phi);
+            phi->addIncoming(ConstantInt::getFalse(context), gateBlock[&lower]);
+            phi->addIncoming(ct.condition, last);
+            propagatedCondition = phi;
+            accountedPhis.insert(phi);
+
+            ct.combined_condition = phi;
+        } else {
+            propagatedCondition = ct.condition;
+            ct.combined_condition = ct.condition;
+        }
+
+        BasicBlock * targetHeader = ct.target->getHeaderNode();
+
+        if (current.contains(targetHeader)) {
+            /* Local control transfer */
+            executionCondition[targetHeader].push_back(propagatedCondition);
+        } else {
+            control_transfer_data ct2 = ct;
+            ct2.target = currentPartition->getBlockInterval(targetHeader);
+            controlTransfers[current.getHeaderNode()].push_back(ct2);
+
+            outs() << "Extrernal control transfer\n";
+        }
+    }
+
+    /* 3. Add PHI nodes for all modified values 
+     * Refreshing consistency of SSA properties for 
+     * merged values that can bypass previous definitions.
+     * Creating PHI nodes to merge them */
+    // FIXME: I forgot what this code does!
+    // TODO: Make out what this code does.
+
+    if (&lower != current.getHeaderNode() && mergeBypassed) {
+        set<BasicBlock *> bbs;
+        findBbs(&lower, bbs);
+
+        set<Value *> defs;
+        findLiveVars(&lower, defs);
+
+        LLVMContext & context = current.getHeaderNode()->getParent()->getContext();
+
+        for (set<Value *>::iterator i = defs.begin(); i != defs.end(); i++){
+            if ((*i)->getType() == Type::getVoidTy(context))
+                continue;
+            outs() << "Bypassed value found\n";
+
+            PHINode * phi = PHINode::Create((*i)->getType(), "mergeBypassed");
+            nextGateBlock[&lower]->getInstList().push_front(phi);
+            // PHI instructons in 'accounted_phi' compute if a certian 
+            // control transfer should be taken, and shoul not be modified.
+            // Consider that %x is a jump condition in basic block 0
+            //
+            // Then, the gate block for a target of branch which contain:
+            //   %x_here = phi [ false, %gate0 ], [ %x, %bb0 ]
+            // encoding the information that if bb0 is not executed, then
+            // this jump cannot happen.
+            // The current loop will also add
+            //   %x_merged = phi [ undef, %gate0], [%x, %bb0 ]
+            // and updated all former users of 'x'. But we should not update
+            // the previously created '%x_here', because that would mean
+            // x_here can can any value if 'bb0' is not executed, which is
+            // not accurate.
+            replaceSomeUsers(*i, phi, bbs, accountedPhis);
+
+            assert(gateBlock[&lower]);
+            BasicBlock * last = lastBasicBlock[&lower];
+            phi->addIncoming(UndefValue::get((*i)->getType()), gateBlock[& lower]);
+            phi->addIncoming(*i, last);
+
+        }
+    }
+
+    // 4. Just to the next gate block
+    BranchInst::Create(nextGateBlock[&lower], lastBasicBlock[&lower]);
+}
+
+/* TODO: incomplete function */
+void LinearizePass::findBbs(const BasicBlock * b,
+        set<BasicBlock *> & result) {
+
+}
+
+/* TODO: incomplete function */
+void LinearizePass::findLiveVars(const BasicBlock * b,
+        set<Value *> & result) {
+
 }
 
 /* TODO: incomplete function */
@@ -658,7 +759,7 @@ void LinearizePass::findLiveVarsV(const vector<BasicBlock *>& b,
 
 }
 
-void LinearizePass::processPartition(const IntervalPartition& p,
+void LinearizePass::processPartition(IntervalPartition& p,
         Function& f) {
     outs() << "Partition has " << p.getIntervals().size() << "intervals\n";
 
