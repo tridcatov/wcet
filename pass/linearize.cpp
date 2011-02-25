@@ -103,8 +103,8 @@ namespace {
         void findLiveVarsV(const vector<BasicBlock *> &, set<Value *> &);
 
         void processPartition(IntervalPartition &, Function &);
-        void processNonLoopingInterval(const Interval &, Function &);
-        void processLoopingInterval(const Interval &, set<BasicBlock *> *, Function &);
+        void processNonLoopingInterval(Interval &, Function &);
+        void processLoopingInterval(Interval &, set<BasicBlock *> *, Function &);
         void processLowerInterval(const BasicBlock &, const Interval &, bool mergeBypassed = true);
         void createGates(const Interval &, Function &,
                 set<BasicBlock *> * scc = 0 );
@@ -114,7 +114,7 @@ namespace {
         void replaceSomeUsers(Value * form, Value * to,
                 const set<BasicBlock *> &, const set<Value *> &);
 
-        void convertPHINodes(const Interval & current);
+        void convertPHINodes(Interval & current);
 
         map<const Interval *, set<BasicBlock *> > extraBbs;
         map<const Interval *, bool> looping;
@@ -232,12 +232,69 @@ Value * LinearizePass::foldr(const vector<Value *> & values, Instruction::Binary
     return result;
 }
 
-/* TODO: incomplete function */
-void LinearizePass::convertPHINodes(const Interval & current) {
+void LinearizePass::convertPHINodes(Interval & current) {
+    /* Massive refactore, because it seems like 
+     * Intervals are atomic in 2.8. Good lord... */
+    /* TODO: check semantics of non recursive intervals */
+    for(int i = 0; i < current.Nodes.size(); i++) {
+        BasicBlock * bb = current.Nodes[i];
+        
+        
+        for(BasicBlock::iterator i = bb->begin(), e = bb->end(); i != e; i++) {
+            Instruction * inst = &*i;
+            if (PHINode * phi = dyn_cast<PHINode>(inst)) {
+                // The phi node has a list of predecessor 
+                // basic blocks and a values corresponding
+                // to those basic blocks.
+                // We want for each basic block to compute
+                // if we possible can arrive from that
+                // basic block. 
+                map<BasicBlock *, control_transfer_data> bb2ct;
+                for (Interval::pred_iterator p = pred_begin(&current);
+                        p != pred_end(&current); p++) {
+                    const vector<control_transfer_data> & ct2 = 
+                        controlTransfers[*p];
 
+                    for(int k = 0; k < ct2.size(); k++) {
+                        control_transfer_data d = ct2[k];
+                        if (d.target == &current) {
+                            assert(bb2ct.count(d.source) == 0);
+                            bb2ct[d.source] = d;
+                        }
+                    }
+                }
+
+                vector<Value *> parameters;
+                LLVMContext & context = current.getHeaderNode()->getParent()->getContext();
+                parameters.push_back(ConstantInt::get(
+                            Type::getInt32Ty(context),phi->getNumIncomingValues()));
+                for(int k = 0; k < phi->getNumIncomingValues(); k++){
+                    BasicBlock * pred = phi->getIncomingBlock(k);
+                    assert(bb2ct.count(pred) != 0);
+                    Value * cond = bb2ct[pred].combined_condition;
+                    // Casting via Int->...
+                    Value * condInt = CastInst::Create(
+                            Instruction::CastOpsBegin,
+                            cond, Type::getInt32Ty(context), "", phi);
+                    parameters.push_back(condInt);
+                    parameters.push_back(phi->getIncomingValue(k));
+                }
+                Instruction * call = CallInst::Create<vector<Value *>::iterator>(
+                        mergeFunction,
+                        parameters.begin(), parameters.end(),
+                        "", phi);
+                inst->replaceAllUsesWith(call);
+                inst->eraseFromParent();
+                inst = call;
+            } else {
+                // No more phi nodes
+                break;
+            }
+        } 
+    }
 }
 
-void LinearizePass::processLoopingInterval(const Interval & current,
+void LinearizePass::processLoopingInterval(Interval & current,
         set<BasicBlock *> * scc, Function & f) {
     BasicBlock * header = current.getHeaderNode();
 
@@ -506,7 +563,7 @@ void LinearizePass::processLoopingInterval(const Interval & current,
 
 }
 
-void LinearizePass::processNonLoopingInterval(const Interval & current,
+void LinearizePass::processNonLoopingInterval(Interval & current,
         Function & f) {
     executionCondition.clear();
     gate.clear();
