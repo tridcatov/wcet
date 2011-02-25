@@ -97,15 +97,16 @@ namespace {
         IntervalPartition* currentPartition;
 
         bool findScc(const Interval &, set<BasicBlock *> &);
-        void findBbs(const BasicBlock *, set<BasicBlock *> & result);
-        void findBbsV(const vector<BasicBlock *> &, set<BasicBlock *> &);
-        void findLiveVars(const BasicBlock *, set<Value *> &);
-        void findLiveVarsV(const vector<BasicBlock *> &, set<Value *> &);
+        void findDefs(BasicBlock *, set<Value *> &);
+        void findBbs(BasicBlock *, set<BasicBlock *> & result);
+        void findBbsV(vector<BasicBlock *> &, set<BasicBlock *> &);
+        void findLiveVars(BasicBlock *, set<Value *> &);
+        void findLiveVarsV(vector<BasicBlock *> &, set<Value *> &);
 
         void processPartition(IntervalPartition &, Function &);
         void processNonLoopingInterval(Interval &, Function &);
         void processLoopingInterval(Interval &, set<BasicBlock *> *, Function &);
-        void processLowerInterval(const BasicBlock &, const Interval &, bool mergeBypassed = true);
+        void processLowerInterval(BasicBlock &, const Interval &, bool mergeBypassed = true);
         void createGates(const Interval &, Function &,
                 set<BasicBlock *> * scc = 0 );
 
@@ -116,7 +117,7 @@ namespace {
 
         void convertPHINodes(Interval & current);
 
-        map<const Interval *, set<BasicBlock *> > extraBbs;
+        map<BasicBlock *, set<BasicBlock *> > extraBbs;
         map<const Interval *, bool> looping;
 
         map<const BasicBlock *, vector<Value *> > executionCondition;
@@ -346,25 +347,25 @@ void LinearizePass::processLoopingInterval(Interval & current,
     BasicBlock * mergeValuesBypassedInLastInterval = BasicBlock::Create(
             currentContext, "mergeValuesBypassedInLastInterval",
             &f, firstGateOutside);
-    extraBbs[&current].insert(mergeValuesBypassedInLastInterval);
+    extraBbs[header].insert(mergeValuesBypassedInLastInterval);
 
     BasicBlock * checkIfJumpOutIsPossible = BasicBlock::Create(
             currentContext, "checkIfJumpOutIsPossible",
             &f, firstGateOutside);
-    extraBbs[&current].insert(checkIfJumpOutIsPossible);
+    extraBbs[header].insert(checkIfJumpOutIsPossible);
 
     BasicBlock * mergeOutValues = BasicBlock::Create(
             currentContext, "mergeOutValues",
             &f, firstGateOutside);
-    extraBbs[&current].insert(mergeOutValues);
+    extraBbs[header].insert(mergeOutValues);
 
     BasicBlock * branchBack = BasicBlock::Create(
             currentContext, "branchBack", &f, firstGateOutside);
-    extraBbs[&current].insert(branchBack);
+    extraBbs[header].insert(branchBack);
 
     BasicBlock * loadOutValues = BasicBlock::Create(
             currentContext, "loadOutValues", &f, firstGateOutside);
-    extraBbs[&current].insert(loadOutValues);
+    extraBbs[header].insert(loadOutValues);
 
     BranchInst::Create(branchBack, mergeOutValues);
     BranchInst::Create(checkIfJumpOutIsPossible,
@@ -522,7 +523,7 @@ void LinearizePass::processLoopingInterval(Interval & current,
                      * reloaded variable */
                     set<BasicBlock *> bbs;
                     findBbsV(blocksInScc, bbs);
-                    bbs.insert(extraBbs[&current].begin(), extraBbs[&current].end());
+                    bbs.insert(extraBbs[header].begin(), extraBbs[header].end());
 
                     set<Value *> dummy;
                     replaceSomeUsers(*i, load, bbs, dummy);
@@ -653,7 +654,7 @@ void LinearizePass::createGates(const Interval& current, Function& f,
         BasicBlock * pseudo = nodes[i];
         BasicBlock * gb = BasicBlock::Create(f.getContext(), "gate",
                 &f, firstBasicBlock[pseudo]);
-        extraBbs[&current].insert(gb);
+        extraBbs[current.getHeaderNode()].insert(gb);
         gateBlock[pseudo] = gb;
         nextGateBlock[nodes[i-1]] = gb;
     }
@@ -662,7 +663,7 @@ void LinearizePass::createGates(const Interval& current, Function& f,
     lastBasicBlock[current.getHeaderNode()] = intervalEnd;
 }
 
-void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interval & current, bool mergeBypassed) {
+void LinearizePass::processLowerInterval(BasicBlock & lower, const Interval & current, bool mergeBypassed) {
     outs() << "Processing interval " << & lower << " " << lower;
 
     /* 1. Create gate Branch
@@ -792,28 +793,54 @@ void LinearizePass::processLowerInterval(const BasicBlock & lower, const Interva
     BranchInst::Create(nextGateBlock[&lower], lastBasicBlock[&lower]);
 }
 
-/* TODO: incomplete function */
-void LinearizePass::findBbs(const BasicBlock * b,
+void LinearizePass::findBbs(BasicBlock * b,
         set<BasicBlock *> & result) {
+    result.insert(b);
+    result.insert(extraBbs[b].begin(), extraBbs[b].end());
 
 }
 
-/* TODO: incomplete function */
-void LinearizePass::findLiveVars(const BasicBlock * b,
+void LinearizePass::findLiveVars(BasicBlock * b,
         set<Value *> & result) {
+    set<BasicBlock *> bbs;
+    findBbs(b, bbs);
+
+    set<Value *> defs;
+    findDefs(b, defs);
+
+    for(set<Value *>::iterator i = defs.begin(); i != defs.end(); i++) {
+        if ((*i)->getType() == Type::getVoidTy(b->getParent()->getContext()))
+            continue;
+
+        for(Value::use_iterator j = (*i)->use_begin();
+                j != (*i)->use_end(); j++) {
+            User * u = (*j);
+            Instruction * inst = dyn_cast<Instruction>(u);
+            if (inst && bbs.count(inst->getParent()) == 0) 
+                result.insert(*i);
+        }
+    }
 
 }
 
-/* TODO: incomplete function */
-void LinearizePass::findBbsV(const vector<BasicBlock *>& b,
+void LinearizePass::findDefs(BasicBlock * b,
+        set<Value *> & result) {
+    for(BasicBlock::iterator i = b->begin(); i != b->end(); i++)
+        result.insert(i);
+}
+
+void LinearizePass::findBbsV(vector<BasicBlock *>& b,
         set<BasicBlock *> & result) {
-
+    for(vector<BasicBlock *>::iterator i = b.begin(), e = b.end();
+            i != e; i++)
+        findBbs(*i, result);
 }
 
-/* TODO: incomplete function */
-void LinearizePass::findLiveVarsV(const vector<BasicBlock *>& b,
+void LinearizePass::findLiveVarsV(vector<BasicBlock *>& b,
         set<Value *> & result) {
-
+    for(vector<BasicBlock *>::iterator i = b.begin(), e = b.end();
+            i != e; i++)
+        findLiveVars(*i, result);
 }
 
 void LinearizePass::processPartition(IntervalPartition& p,
