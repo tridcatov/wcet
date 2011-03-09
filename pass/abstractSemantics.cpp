@@ -49,6 +49,76 @@ namespace {
         Function * maxFunction;
 
         vector<Value *> toDeleteLater;
+
+        mapping_kind_t getMappingKind(Value *) {
+            mapping_kind_t t;
+            return t;
+        }
+
+        Value * getMinValue(Value *, Instruction *) {
+            return 0;
+        }
+
+        Value * getMaxValue(Value* , Instruction* ) {
+            return 0;
+        }
+
+        Value * getValueProper(Value *, Instruction *) {
+            return 0;
+        }
+
+        Value * getValueDefined(Value *, Instruction *) {
+            return 0;
+        }
+
+        void visitLoadInst(LoadInst &) {}
+        void storeToField(Value *, Value *,
+                int, const string &, Instruction *) {}
+        Value * loadField(Value *, int, Instruction *) {
+            return 0;
+        }
+        void visitStoreInst(StoreInst &) {}
+        //void visitSetCondInst(SetCondInst &);
+        void visitBranchInst(BranchInst &) {}
+        
+        void visitAdd(BinaryOperator & op) {
+            LLVMContext & context = module->getContext();
+            assert(op.getType() == Type::getInt32Ty(context));
+
+            Value * min = BinaryOperator::Create(Instruction::Add,
+                    getMinValue(op.getOperand(0), &op),
+                    getMinValue(op.getOperand(1), &op),
+                    op.getName() + "_min", &op);
+
+            Value * max = BinaryOperator::Create(Instruction::Add,
+                    getMinValue(op.getOperand(0), &op),
+                    getMinValue(op.getOperand(1), &op),
+                    op.getName() + "_max", &op);
+
+            mappedKind[&op] = MappedToPair;
+            mappedMin[&op] = min;
+            mappedMax[&op] = max;
+        }
+
+        void visitSub(BinaryOperator & op) {
+            LLVMContext & context = module->getContext();
+            assert(op.getType() == Type::getInt32Ty(context));
+
+            Value * min = BinaryOperator::Create(Instruction::Sub,
+                    getMinValue(op.getOperand(0), &op),
+                    getMinValue(op.getOperand(1), &op),
+                    op.getName() + "_min", &op);
+
+            Value * max = BinaryOperator::Create(Instruction::Sub,
+                    getMinValue(op.getOperand(0), &op),
+                    getMinValue(op.getOperand(1), &op),
+                    op.getName() + "_max", &op);
+
+            mappedKind[&op] = MappedToPair;
+            mappedMin[&op] = min;
+            mappedMax[&op] = max;
+        }
+        
     };
 
     char Marker::ID = 0;
@@ -146,13 +216,15 @@ bool Marker::runOnModule(Module &M) {
         // TODO: add correct parameter type handling
     }
 
-    visit(module);
+    visit(M);
 
     for (int i = 0; i < toDeleteLater.size(); i++) {
         toDeleteLater[i]->replaceAllUsesWith(ConstantInt::getSigned(
                     Type::getInt32Ty(context), 0));
         delete toDeleteLater[i];
     }
+
+    M.dump();
 
     return true;
 }
