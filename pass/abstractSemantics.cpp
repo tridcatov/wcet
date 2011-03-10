@@ -410,6 +410,13 @@ namespace {
             mappedValueProper[&op] = &op;
             mappedValueDefined[&op] = defined;
         }
+
+        void visitAllocaInst(AllocaInst & alloca) {
+            assert(alloca.getAllocatedType() == Type::getInt32Ty(module->getContext()));
+            Value * pair = new AllocaInst(pairOfInts, 0, alloca.getName() + "_pair", &alloca);
+            mappedKind[&alloca] = MappedToPair;
+            mappedValue[&alloca] = pair;
+        }
     };
 
     char Marker::ID = 0;
