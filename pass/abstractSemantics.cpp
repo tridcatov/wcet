@@ -65,8 +65,47 @@ namespace {
             return mappedKind[v];
         }
 
-        Value * getMinValue(Value *, Instruction *) {
-            return 0;
+        Value * getMinValue(Value * v, Instruction * i) {
+            if (isa<UndefValue>(v))
+                return v;
+
+            if (isa<Constant>(v) && !isa<GlobalVariable>(v))
+                return v;
+
+            if (mappedMin.count(v))
+                return mappedMin[v];
+
+            if (mappedValue.count(v)) {
+                Value * mapped = mappedValue[v];
+                assert(mapped->getType() == PointerType::getUnqual(pairOfInts));
+
+                const Type * type = Type::getInt32Ty(module->getContext());
+                vector<Value *> cs;
+                Value * c = ConstantInt::get(type, 0);
+                cs.push_back(c);
+                cs.push_back(c);
+
+                Value * addr = GetElementPtrInst::Create
+                    <vector<Value *>::iterator>(
+                        mapped,
+                        cs.begin(),
+                        cs.end(),
+                        "min_a", i);
+
+                Value * min = new LoadInst(addr, "min", i);
+
+                return min;
+            }
+
+            // No value, creating fake via cloning
+            assert(v->getType() == Type::getInt32Ty(module->getContext()));
+            Instruction * inst = dyn_cast<Instruction>(v);
+            assert(inst);
+            mappedFake[v] = true;
+            mappedMin[v] = inst->clone();
+
+            return mappedMin[v];
+
         }
 
         Value * getMaxValue(Value* , Instruction* ) {
