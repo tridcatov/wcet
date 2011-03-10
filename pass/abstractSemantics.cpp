@@ -217,8 +217,20 @@ namespace {
             }
         }
 
-        void storeToField(Value *, Value *,
-                int, const string &, Instruction *) {}
+        void storeToField(Value * what, Value * where,
+                int field_number, const string & name,
+                Instruction * i) {
+            const Type * type = Type::getInt32Ty(module->getContext());
+            vector<Value *> cs;
+            cs.push_back(ConstantInt::get(type, 0));
+            cs.push_back(ConstantInt::get(type, field_number));
+            Value * address = GetElementPtrInst::Create
+                <vector<Value *>::iterator> (where,
+                        cs.begin(), cs.end(), where->getName() + name, i);
+
+            new StoreInst(what, address, i);
+        }
+
         Value * loadField(Value *, int, Instruction *) {
             return 0;
         }
