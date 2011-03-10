@@ -108,8 +108,47 @@ namespace {
 
         }
 
-        Value * getMaxValue(Value* , Instruction* ) {
-            return 0;
+        Value * getMaxValue(Value * v, Instruction * i) {
+            if (isa<UndefValue>(v))
+                return v;
+
+            if (isa<Constant>(v) && !isa<GlobalVariable>(v))
+                return v;
+
+            if (mappedMax.count(v))
+                return mappedMax[v];
+
+            if (mappedValue.count(v)) {
+                Value * mapped = mappedValue[v];
+                assert(mapped->getType() == PointerType::getUnqual(pairOfInts));
+
+                const Type * type = Type::getInt32Ty(module->getContext());
+                vector<Value *> cs;
+                Value * c = ConstantInt::get(type, 0);
+                cs.push_back(c);
+                c = ConstantInt::get(type, 1);
+                cs.push_back(c);
+
+                Value * addr = GetElementPtrInst::Create
+                    <vector<Value *>::iterator>(
+                        mapped,
+                        cs.begin(),
+                        cs.end(),
+                        "max_a", i);
+
+                Value * max = new LoadInst(addr, "max", i);
+
+                return max;
+            }
+
+            // No value, creating fake via cloning
+            assert(v->getType() == Type::getInt32Ty(module->getContext()));
+            Instruction * inst = dyn_cast<Instruction>(v);
+            assert(inst);
+            mappedFake[v] = true;
+            mappedMax[v] = inst->clone();
+
+            return mappedMax[v];
         }
 
         Value * getValueProper(Value *, Instruction *) {
