@@ -54,9 +54,15 @@ namespace {
         set<Value *> newlyAdded;
         vector<Value *> toDeleteLater;
 
-        mapping_kind_t getMappingKind(Value *) {
-            mapping_kind_t t;
-            return t;
+        mapping_kind_t getMappingKind(Value * v) {
+            if (isa<Constant>(v)) {
+                if (v->getType() == Type::getInt32Ty(module->getContext())) {
+                    return MappedToPair;
+                } else if (v->getType() == Type::getInt1Ty(module->getContext())) {
+                    return MappedToValueAndFlag;
+                }
+            }
+            return mappedKind[v];
         }
 
         Value * getMinValue(Value *, Instruction *) {
