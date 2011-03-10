@@ -8,6 +8,7 @@
 #include "llvm/ValueSymbolTable.h"
 #include "llvm/TypeSymbolTable.h"
 #include "llvm/Support/InstVisitor.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <vector>
 
@@ -44,10 +45,13 @@ namespace {
         map<Value *, bool> mappedFake;
 
 
+        using InstVisitor<Marker>::visit;
+
         Function * merge2Function;
         Function * mergeOut2Function;
         Function * maxFunction;
 
+        set<Value *> newlyAdded;
         vector<Value *> toDeleteLater;
 
         mapping_kind_t getMappingKind(Value *) {
@@ -79,7 +83,36 @@ namespace {
         }
         void visitStoreInst(StoreInst &) {}
         //void visitSetCondInst(SetCondInst &);
-        void visitBranchInst(BranchInst &) {}
+        void visitBranchInst(BranchInst & branch) {
+            if (! branch.isConditional())
+                return;
+            outs() << "Processing branch: " << & branch << "\n";
+
+            if (newlyAdded.count(& branch))
+                return;
+
+            Value * cond =  branch.getCondition();
+
+            assert(mappedKind[cond] = MappedToValueAndFlag);
+            // The branch should be taken either condition is true
+            // or not strictly defined so
+            Value * notSure = BinaryOperator::Create(
+                    Instruction::Xor, getValueDefined(cond, &branch),
+                    ConstantInt::getTrue(module->getContext()),
+                    cond->getName() + "_notSure",
+                    &branch);
+
+            Value * shouldBeTaken = BinaryOperator::Create(
+                    Instruction::Or, getValueProper(cond, &branch),
+                    notSure, cond->getName() + "_shouldBeTaken",
+                    &branch);
+
+            Value * nv = BranchInst::Create(branch.getSuccessor(0),
+                    branch.getSuccessor(1), shouldBeTaken, branch.getParent());
+            newlyAdded.insert(nv);
+            branch.eraseFromParent();
+
+        }
         
         void visitAdd(BinaryOperator & op) {
             LLVMContext & context = module->getContext();
