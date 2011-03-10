@@ -151,12 +151,20 @@ namespace {
             return mappedMax[v];
         }
 
-        Value * getValueProper(Value *, Instruction *) {
-            return 0;
+        Value * getValueProper(Value * v, Instruction *) {
+            if (isa<Constant>(v))
+                return v;
+
+            assert(mappedValueProper.count(v));
+            return mappedValueProper[v];
         }
 
-        Value * getValueDefined(Value *, Instruction *) {
-            return 0;
+        Value * getValueDefined(Value * v, Instruction *) {
+            if (isa<Constant>(v))
+                return ConstantInt::getTrue(module->getContext());
+
+            assert(mappedValueDefined.count(v));
+            return mappedValueDefined[v];
         }
 
         void visitLoadInst(LoadInst &) {}
