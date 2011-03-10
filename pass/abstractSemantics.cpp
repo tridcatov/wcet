@@ -218,12 +218,12 @@ namespace {
         }
 
         void storeToField(Value * what, Value * where,
-                int field_number, const string & name,
+                int fieldNumber, const string & name,
                 Instruction * i) {
             const Type * type = Type::getInt32Ty(module->getContext());
             vector<Value *> cs;
             cs.push_back(ConstantInt::get(type, 0));
-            cs.push_back(ConstantInt::get(type, field_number));
+            cs.push_back(ConstantInt::get(type, fieldNumber));
             Value * address = GetElementPtrInst::Create
                 <vector<Value *>::iterator> (where,
                         cs.begin(), cs.end(), where->getName() + name, i);
@@ -231,9 +231,19 @@ namespace {
             new StoreInst(what, address, i);
         }
 
-        Value * loadField(Value *, int, Instruction *) {
-            return 0;
+        Value * loadField(Value * structPointer,
+                int fieldNumber, Instruction * i) {
+            const Type * type = Type::getInt32Ty(module->getContext());
+            vector<Value *> cs;
+            cs.push_back(ConstantInt::get(type, 0));
+            cs.push_back(ConstantInt::get(type, fieldNumber));
+            Value * address = GetElementPtrInst::Create
+                <vector<Value *>::iterator> (structPointer,
+                        cs.begin(), cs.end(), "", i);
+
+            return new LoadInst(address, "", i);
         }
+
         void visitStoreInst(StoreInst &) {}
         //void visitSetCondInst(SetCondInst &);
         
