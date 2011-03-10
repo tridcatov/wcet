@@ -379,6 +379,37 @@ namespace {
             mappedValueProper[&op] = &op;
             mappedValueDefined[&op] = ConstantInt::getTrue(module->getContext());
         }
+
+        void visitXor(BinaryOperator & op) {
+            visitLogical(op);
+        }
+
+        void visitOr(BinaryOperator & op) {
+            visitLogical(op);
+        }
+
+        void visitLogical(BinaryOperator & op) {
+            mappedKind[&op] = MappedToValueAndFlag;
+
+            Value * first = op.getOperand(0);
+            Value * second = op.getOperand(1);
+
+            Value * firstDefined = getValueDefined(first, &op);
+            Value * secondDefined = getValueDefined(second, &op);
+
+            Value * defined = BinaryOperator::Create(Instruction::And,
+                    firstDefined, secondDefined, op.getName() + "_defined", &op);
+            mappedValueDefined[&op] = defined;
+
+            Value * firstProper = getValueProper(first, &op);
+            Value * secondProper = getValueProper(second, &op);
+
+            op.setOperand(0, firstProper);
+            op.setOperand(1, secondProper);
+
+            mappedValueProper[&op] = &op;
+            mappedValueDefined[&op] = defined;
+        }
     };
 
     char Marker::ID = 0;
