@@ -28,7 +28,8 @@ namespace {
     {    
     public:    
         bool runOnModule(Module &M);
-        Marker(): ModulePass(ID) {}
+        Marker(): ModulePass(ID), merge2Function(0),
+            mergeOut2Function(0) {}
         static char ID;
         
         Module * module;
@@ -416,6 +417,115 @@ namespace {
             Value * pair = new AllocaInst(pairOfInts, 0, alloca.getName() + "_pair", &alloca);
             mappedKind[&alloca] = MappedToPair;
             mappedValue[&alloca] = pair;
+        }
+
+        void visitCallInst(CallInst & call) {
+            string name = call.getCalledFunction()->getName();
+            Value * fake = 0;
+            if (name == "updateValueForTrueBranch") {
+                mappedKind[&call] = MappedToValueAndFlag; 
+                // No SetCondInst so far, merging
+                mappedMin[&call] = UndefValue::get(call.getType());
+                mappedMax[&call] = UndefValue::get(call.getType());
+
+                fake = BinaryOperator::Create(Instruction::Add,
+                        ConstantInt::get(Type::getInt32Ty(module->getContext()), 1),
+                        ConstantInt::get(Type::getInt32Ty(module->getContext()), 1),
+                        "fake", &call);
+            } else if (name == "updateValueForFalseBranch") {
+                // TODO: finaly decide what to do with SCI
+            
+            } else if (name == "merge_values") {
+                Value * retval = new AllocaInst(pairOfInts, 0, "retval", &call);
+                vector<Value *> params;
+                params.push_back(retval);
+
+                // First - function, second - num of values,
+                // third - CF flag, fourth - incoming val
+                params.push_back(call.getOperand(1));
+                for (int i = 2; i < call.getNumOperands(); i += 2) {
+                    params.push_back(call.getOperand(i));
+                    Value * v = call.getOperand(i+1);
+
+                    params.push_back(getMinValue(v, &call));
+                    params.push_back(getMaxValue(v, &call));
+                }
+
+                CallInst::Create<vector<Value *>::iterator>(
+                        demandMerge2Function(), params.begin(),
+                        params.end(), "", &call);
+
+                Value * retMin = loadField(retval, 0, &call);
+                Value * retMax = loadField(retval, 1, &call);
+
+                mappedKind[&call] = MappedToPair;
+                mappedMin[&call] = retMin;
+                mappedMax[&call] = retMax;
+
+                fake = BinaryOperator::Create(BinaryOperator::Add,
+                        call.getOperand(1), ConstantInt::get(
+                            Type::getInt32Ty(module->getContext()), 1),
+                        "fake", &call);
+            } else if (name == "merge_out_value") {
+                Value * out = call.getOperand(1);
+                Value * newVal = call.getOperand(2);
+                Value * firstIter = call.getOperand(3);
+
+                Value * mappedOut = mappedValue[out];
+                assert(mappedOut);
+
+                vector<Value *> params;
+                params.push_back(mappedOut);
+                params.push_back(getMinValue(newVal, &call));
+                params.push_back(getMaxValue(newVal, &call));
+                params.push_back(firstIter);
+                CallInst::Create<vector<Value *>::iterator>(
+                        demandMergeOut2Function(), params.begin(),
+                        params.end(), "", &call);
+
+                call.eraseFromParent();
+                return;
+            } else {
+                // Which is presumably to be passed always
+                assert(false && "non-builtin function");
+            }
+
+            mappedKind[fake] = MappedToPair;
+            mappedMin[fake] = mappedMin[&call];
+            mappedMax[fake] = mappedMax[&call];
+
+            call.replaceAllUsesWith(fake);
+            call.eraseFromParent();
+        }
+
+        Value * demandMerge2Function() {
+            if (! merge2Function) {
+                vector<const Type *> paramTypes;
+                paramTypes.push_back(PointerType::getUnqual(pairOfInts));
+                paramTypes.push_back(Type::getInt32Ty(module->getContext()));
+                FunctionType * ft = FunctionType::get(
+                        Type::getVoidTy(module->getContext()),
+                        paramTypes, true);
+                module->getOrInsertFunction("merge2", ft);
+                merge2Function = module->getFunction("merge2"); 
+            }
+            return (Value *)merge2Function;
+        }
+
+        Value * demandMergeOut2Function() {
+            if (! mergeOut2Function) {
+                vector<const Type *> paramTypes;
+                paramTypes.push_back(PointerType::getUnqual(pairOfInts));
+                paramTypes.push_back(Type::getInt32Ty(module->getContext()));
+                paramTypes.push_back(Type::getInt32Ty(module->getContext()));
+                paramTypes.push_back(Type::getInt1Ty(module->getContext()));
+                FunctionType * ft=  FunctionType::get(
+                        Type::getVoidTy(module->getContext()),
+                        paramTypes, true);
+                module->getOrInsertFunction("merge_out2", ft);
+                mergeOut2Function = module->getFunction("merge_out2");
+            }
+            return (Value *)mergeOut2Function;
         }
     };
 
