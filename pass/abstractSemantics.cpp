@@ -527,6 +527,25 @@ namespace {
             }
             return (Value *)mergeOut2Function;
         }
+
+        void visit(Instruction & i) {
+            if (newlyAdded.count(& i))
+                return;
+
+            bool fake = mappedFake[&i];
+            Value * fakeMin = mappedMin[&i];
+            Value * fakeMax = mappedMax[&i];
+            
+            InstVisitor<Marker>::visit(i);
+
+            if (fake) {
+                mappedFake[&i] = false;
+                fakeMin->replaceAllUsesWith(mappedMin[&i]);
+                fakeMax->replaceAllUsesWith(mappedMax[&i]);
+                delete fakeMin;
+                delete fakeMax;
+            }
+        }
     };
 
     char Marker::ID = 0;
