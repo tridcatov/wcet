@@ -244,7 +244,34 @@ namespace {
             return new LoadInst(address, "", i);
         }
 
-        void visitStoreInst(StoreInst &) {}
+        void visitStoreInst(StoreInst & store) {
+            Value * address = store.getOperand(1);
+            if (GlobalVariable * var = dyn_cast<GlobalVariable>(address)) {
+                if (mappedKind[var] == MappedToPair) {
+                    Value * target = mappedValue[var];
+                    Value * source = store.getOperand(0);
+
+                    storeToField(getMinValue(source, &store),
+                            target, 0, "_min", &store);
+                    storeToField(getMaxValue(source, &store),
+                            target, 1, "_max", &store);
+                } else {
+                    assert(var ->getType()->getElementType() ==
+                            Type::getInt1Ty(module->getContext()));
+                    Value * target = mappedValue[var];
+                    Value * source = store.getOperand(0);
+                    Value * sourceValue = getValueProper(source, &store);
+                    Value * sourceDefined = getValueDefined(source, &store);
+
+                    storeToField(sourceValue, target, 0, "_val_a", &store);
+                    storeToField(sourceDefined, target, 1, "_val_def_a", &store);
+                }
+
+                store.eraseFromParent();
+            }
+        }
+        
+        // TODO: no SetCondInst'ruction so far, checkout
         //void visitSetCondInst(SetCondInst &);
         
         
@@ -316,7 +343,42 @@ namespace {
             mappedMin[&op] = min;
             mappedMax[&op] = max;
         }
+
+        // TODO: no ShitInst'ruction so far, checkout
+        //void visitShiftInst(ShiftInst & shift);
         
+        void visitPHINode(PHINode & op) {
+            // Merge PHI's and those that set 'bb executed' flag
+            assert(op.getNumIncomingValues() == 2);
+
+            if (op.getType() == Type::getInt32Ty(module->getContext())) {
+                mappedKind[&op] = MappedToPair;
+                
+                PHINode * min = PHINode::Create(op.getType(),
+                        op.getName() + "_min", &op);
+
+                min->addIncoming(getMinValue(op.getIncomingValue(0), &op),
+                        op.getIncomingBlock(0));
+                min->addIncoming(getMinValue(op.getIncomingValue(1), &op),
+                        op.getIncomingBlock(1));
+
+                PHINode * max = PHINode::Create(op.getType(),
+                        op.getName() + "_max", &op);
+
+                min->addIncoming(getMaxValue(op.getIncomingValue(0), &op),
+                        op.getIncomingBlock(0));
+                min->addIncoming(getMaxValue(op.getIncomingValue(1), &op),
+                        op.getIncomingBlock(1));
+
+                mappedMin[&op] = min;
+                mappedMax[&op] = max;
+                return;
+            }
+
+            mappedKind[&op] = MappedToValueAndFlag;
+            mappedValueProper[&op] = &op;
+            mappedValueDefined[&op] = ConstantInt::getTrue(module->getContext());
+        }
     };
 
     char Marker::ID = 0;
