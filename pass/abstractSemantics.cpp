@@ -167,7 +167,56 @@ namespace {
             return mappedValueDefined[v];
         }
 
-        void visitLoadInst(LoadInst &) {}
+        void visitLoadInst(LoadInst & load) {
+            Value * op = load.getOperand(0);
+            if (isa<GlobalVariable>(op) || isa<AllocaInst>(op)) {
+                assert(mappedKind[op] == MappedToPair);
+                Value * mapped = mappedValue[op];
+                assert(mapped);
+
+                const Type * type = Type::getInt32Ty(module->getContext());
+                vector<Value *> cs;
+                Value * c = ConstantInt::get(type, 0);
+                cs.push_back(c);
+                cs.push_back(c);
+
+                Value * min_a = GetElementPtrInst::Create
+                    <vector<Value *>::iterator>(
+                        mapped,
+                        cs.begin(),
+                        cs.end(),
+                        op->getName() + "_min_a", &load);
+
+                Value * min = new LoadInst(min_a,
+                       op->getName() + "_min", &load);
+
+                cs.clear();
+                cs.push_back(c);
+                c = ConstantInt::get(type, 1);
+                cs.push_back(c);
+
+                Value * max_a = GetElementPtrInst::Create
+                    <vector<Value *>::iterator>(
+                        mapped,
+                        cs.begin(),
+                        cs.end(),
+                        op->getName() + "_max_a", &load);
+
+                Value * max = new LoadInst(max_a,
+                        op->getName() + "max", &load);
+
+                mappedKind[&load] = MappedToPair;
+                mappedMin[&load] = min;
+                mappedMax[&load] = max;
+            } else {
+                // Load from pointer. Assume range undefined
+                mappedKind[&load] = MappedToPair;
+                const Type * type = Type::getInt32Ty(module->getContext());
+                mappedMin[&load] = ConstantInt::get(type, -10000);
+                mappedMax[&load] = ConstantInt::get(type, 10000);
+            }
+        }
+
         void storeToField(Value *, Value *,
                 int, const string &, Instruction *) {}
         Value * loadField(Value *, int, Instruction *) {
@@ -175,6 +224,8 @@ namespace {
         }
         void visitStoreInst(StoreInst &) {}
         //void visitSetCondInst(SetCondInst &);
+        
+        
         void visitBranchInst(BranchInst & branch) {
             if (! branch.isConditional())
                 return;
