@@ -90,6 +90,8 @@ namespace {
         Function * mergeOutFunction;
         Function * currentFunction;
 
+        void getAnalysisUsage(AnalysisUsage & Info) const;
+
         map<const BasicBlock *, vector<control_transfer_data> > controlTransfers;
         map<const BasicBlock *, BasicBlock *> firstBasicBlock;
         map<const BasicBlock *, BasicBlock *> lastBasicBlock;
@@ -135,7 +137,7 @@ namespace {
     INITIALIZE_PASS(LinearizePass,
             "linearize",
             "Remote all conditionals",
-            true, true);
+            true, false);
 };
 
 bool LinearizePass::runOnFunction(Function & f) {
@@ -223,6 +225,12 @@ bool LinearizePass::findScc(const Interval& I, set<BasicBlock *>& scc) {
     }
 
     return hasBackEdges;
+}
+
+void LinearizePass::getAnalysisUsage(AnalysisUsage & Info) const {
+    Info.setPreservesCFG();
+    errs() << "!!!!!!!!PRESERVATIONS SET!!!!!!!!!!!!!!!!!!\n";
+    Info.addRequired<IntervalPartition>();
 }
 
 Value * LinearizePass::foldr(const vector<Value *> & values, Instruction::BinaryOps op, BasicBlock * parent) {

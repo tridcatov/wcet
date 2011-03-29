@@ -35,12 +35,22 @@ $llvmdis $1.se.bc -f
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Linearize transformation ($1.li.bc)"
-$llvmopt -load $passes"liblinearize.so" -analyze -linearize $1.se.bc -o $1.li.bc -f
+$llvmopt -load $passes"liblinearize.so" -linearize $1.se.bc -o $1.li.bc -f
 echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
 $llvmdis $1.li.bc -f
 
 stage=$((stage+1))
+echo "[$stage.0:$1] Abstract semantics transformation ($1.as.bc)"
+$llvmopt -load $passes"libabstractSemantics.so" -abstract-semantics $1.li.bc -o $1.as.bc -f
+echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.as.ll)" 
+$llvmdis $1.as.bc -f
+
 stage=$((stage+1))
+echo "[$stage.0:$1] Finalize optimisations ($1.fin.bc)"
+$llvmopt -dce -deadtypeelim $1.as.bc -o $1.fin.bc -f
+echo "[$stage.1:$1] Final deassembly output ($1.fin.ll)"
+$llvmdis $1.fin.bc -f
+
 stage=$((stage+1))
 stage=$((stage+1))
 stage=$((stage+1))
