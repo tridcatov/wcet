@@ -18,3 +18,7 @@ target_link_libraries(linearize
 add_library(abstractSemantics SHARED abstractSemantics.cpp)
 
 add_library(helloWorld SHARED helloPass.cpp)
+
+add_library(recursionBrakes SHARED recursionBrakes.cpp)
+
+add_library(initUnreachable SHARED initUnreachable.cpp)
