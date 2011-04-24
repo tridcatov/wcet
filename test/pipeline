@@ -4,7 +4,7 @@ passes=@PASSES_PATH@
 llvmtools=@LLVM_TOOLS@
 llvmgcc=@LLVM_GCC@
 
-llvmgcc=$llvmgcc"x86_64-unknown-linux-gnu-llvm-g++"
+llvmgcc="llvm-g++"
 llvmopt=$llvmtools"opt"
 llvmas=$llvmtools"llvm-as"
 llvmdis=$llvmtools"llvm-dis"
@@ -33,11 +33,12 @@ $llvmopt -load $passes"libsingleExit.so" -singleExit $1.s.bc -o $1.se.bc -f
 echo "[$stage.1:$1] Single exit transformation disassembly output ($1.se.ll)"
 $llvmdis $1.se.bc -f
 
-stage=$((stage+1))
-echo "[$stage.0:$1] Linearize transformation ($1.li.bc)"
-$llvmopt -load $passes"liblinearize.so" -linearize $1.se.bc -o $1.li.bc -f
-echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
-$llvmdis $1.li.bc -f
+#stage=$((stage+1))
+#echo "[$stage.0:$1] Linearize transformation ($1.li.bc)"
+#$llvmopt -load $passes"liblinearize.so" -linearize $1.se.bc -o $1.li.bc -f
+#echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
+#$llvmdis $1.li.bc -f
+cp $1.se.bc $1.li.bc
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Abstract semantics transformation ($1.as.bc)"
@@ -46,11 +47,21 @@ echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.as.
 $llvmdis $1.as.bc -f
 
 stage=$((stage+1))
+echo "[$stage.0:$1] Recursion brakes setup ($1.rb.bc)"
+$llvmopt -load $passes"librecursionBrakes.so" -rb $1.as.bc -o $1.rb.bc -f
+echo "[$stage.1:$1] Recursion brakes transformation dissasembly output ($1.rb.ll)"
+$llvmdis $1.rb.bc -f
+
+stage=$((stage+1))
+echo "[$stage.0:$1] Unreachable values markup ($1.iu.bc)"
+$llvmopt -load $passes"libinitUnreachable.so" -iu $1.rb.bc -o $1.iu.bc -f
+echo "[$stage.1:$1] Init Unreachable transforamtion disaasemly output ($1.iu.ll)"
+$llvmdis $1.iu.bc. -f
+
+stage=$((stage+1))
 echo "[$stage.0:$1] Finalize optimisations ($1.fin.bc)"
-$llvmopt -dce -deadtypeelim $1.as.bc -o $1.fin.bc -f
+$llvmopt -dce -deadtypeelim $1.iu.bc -o $1.fin.bc -f
 echo "[$stage.1:$1] Final deassembly output ($1.fin.ll)"
 $llvmdis $1.fin.bc -f
 
-stage=$((stage+1))
-stage=$((stage+1))
 stage=$((stage+1))
