@@ -20,7 +20,7 @@ $llvmas $1.s -f
 
 stage=$((stage+1))
 echo "[$stage:$1] Swinging through functions, greetings"
-$llvmopt -load $passes"libhelloWorld.so" -hello < $1.s.bc > /dev/null
+$llvmopt -load $passes"libhello.so" -hello < $1.s.bc > /dev/null
 
 stage=$((stage+1))
 echo "[$stage:$1] Consequitive numbering of basic blocks"

@@ -1,23 +1,17 @@
 add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
 
-add_library(basicBlocksNumber SHARED basicBlocksNumber.cpp)
+set (PASSES
+    hello
+    basicBlocksNumber
+    singleExit
+    linearize
+    abstractSemantics
+    recursionBrakes
+    initUnreachable
+)
 
-add_library(singleExit SHARED singleExit.cpp)
-
-add_library(linearize SHARED linearize.cpp)
-set_target_properties(linearize PROPERTIES COMPILE_FLAGS "-fPIC")
-
-set (llvmSupport /usr/lib/llvm-2.8/lib/libLLVMSupport.a)
-
-target_link_libraries(linearize
-        ${llvmSupport}
-        )
-
-
-add_library(abstractSemantics SHARED abstractSemantics.cpp)
-
-add_library(helloWorld SHARED helloPass.cpp)
-
-add_library(recursionBrakes SHARED recursionBrakes.cpp)
-
-add_library(initUnreachable SHARED initUnreachable.cpp)
+foreach(PASS ${PASSES})
+    add_library(${PASS} SHARED ${PASS}.cpp)
+    set_target_properties(${PASS} PROPERTIES COMPILE_FLAGS "-fPIC")
+    target_link_libraries(${PASS} logger)
+endforeach(PASS)

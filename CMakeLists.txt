@@ -9,9 +9,11 @@ set (LLVM_TOOLS ${LLVM}/bin/)
 
 include_directories( 
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}
         ${LLVM_INCLUDE}
         )
 
 
 add_subdirectory(pass)
 add_subdirectory(test)
+add_subdirectory(misc)
