@@ -2,9 +2,8 @@
 
 passes=@PASSES_PATH@
 llvmtools=@LLVM_TOOLS@
-llvmgcc=@LLVM_GCC@
 
-llvmgcc="llvm-g++"
+llvmgcc="llvm-g++-4.2"
 llvmopt=$llvmtools"opt"
 llvmas=$llvmtools"llvm-as"
 llvmdis=$llvmtools"llvm-dis"
@@ -38,13 +37,15 @@ $llvmdis $1.se.bc -f
 #$llvmopt -load $passes"liblinearize.so" -linearize $1.se.bc -o $1.li.bc -f
 #echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
 #$llvmdis $1.li.bc -f
-cp $1.se.bc $1.li.bc
+#cp $1.se.bc $1.li.bc
 
-stage=$((stage+1))
-echo "[$stage.0:$1] Abstract semantics transformation ($1.as.bc)"
-$llvmopt -load $passes"libabstractSemantics.so" -abstract-semantics $1.li.bc -o $1.as.bc -f
-echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.as.ll)" 
-$llvmdis $1.as.bc -f
+#stage=$((stage+1))
+#echo "[$stage.0:$1] Abstract semantics transformation ($1.as.bc)"
+#$llvmopt -load $passes"libabstractSemantics.so" -abstract-semantics $1.li.bc -o $1.as.bc -f
+#echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.as.ll)" 
+#$llvmdis $1.as.bc -f
+
+cp $1.se.bc $1.as.bc
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Recursion brakes setup ($1.rb.bc)"
@@ -55,8 +56,8 @@ $llvmdis $1.rb.bc -f
 stage=$((stage+1))
 echo "[$stage.0:$1] Unreachable values markup ($1.iu.bc)"
 $llvmopt -load $passes"libinitUnreachable.so" -iu $1.rb.bc -o $1.iu.bc -f
-echo "[$stage.1:$1] Init Unreachable transforamtion disaasemly output ($1.iu.ll)"
-$llvmdis $1.iu.bc. -f
+echo "[$stage.1:$1] Init Unreachable transforamtion dissasembly output ($1.iu.ll)"
+$llvmdis $1.iu.bc -f
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Finalize optimisations ($1.fin.bc)"
