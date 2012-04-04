@@ -15,7 +15,7 @@ namespace {
         }
         
         bool runOnFunction(Function& F) {
-            logger->log() << F.getName() << "\n";
+                logger->log() << F.getName() << "\n";
             return false;
         }
 

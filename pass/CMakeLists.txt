@@ -7,7 +7,8 @@ set (PASSES
     linearize
     abstractSemantics
     recursionBrakes
-    initUnreachable
+    brandNewLinearize
+    loopInterpreter
 )
 
 foreach(PASS ${PASSES})

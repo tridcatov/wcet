@@ -19,12 +19,18 @@ echo "[$stage:$1] Assembling llvm source to bytecode ($1.s.bc)"
 $llvmas $1.s -f
 
 stage=$((stage+1))
+echo "[$stage:$1] Dissasembly of the initial code ($1.s.ll)"
+$llvmdis $1.s.bc -f
+
+stage=$((stage+1))
 echo "[$stage:$1] Swinging through functions, greetings"
 $llvmopt -load $passes"libhello.so" -hello < $1.s.bc > /dev/null
 
 stage=$((stage+1))
-echo "[$stage:$1] Consequitive numbering of basic blocks"
-$llvmopt -load $passes"libbasicBlocksNumber.so" -basicBlocksNumber < $1.s.bc > /dev/null
+echo "[$stage.0:$1] Consequitive numbering of basic blocks ($1.bbn.bc)"
+$llvmopt -load $passes"libbasicBlocksNumber.so" -basicBlocksNumber $1.s.bc -o $1.bbn.bc -f
+echo "[$stage.1:$1] Basic blocks number disassembly output ($1bbn.ll)"
+$llvmdis $1.bbn.bc -f
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Single exit transformation ($1.se.bc)"
@@ -32,32 +38,29 @@ $llvmopt -load $passes"libsingleExit.so" -singleExit $1.s.bc -o $1.se.bc -f
 echo "[$stage.1:$1] Single exit transformation disassembly output ($1.se.ll)"
 $llvmdis $1.se.bc -f
 
-#stage=$((stage+1))
-#echo "[$stage.0:$1] Linearize transformation ($1.li.bc)"
-#$llvmopt -load $passes"liblinearize.so" -linearize $1.se.bc -o $1.li.bc -f
-#echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
-#$llvmdis $1.li.bc -f
-#cp $1.se.bc $1.li.bc
+stage=$((stage+1))
+echo "[$stage.0:$1] Linearize transformation ($1.li.bc)"
+$llvmopt -load $passes"libbrandNewLinearize.so" -linearize $1.se.bc -o $1.li.bc -f
+echo "[$stage.1:$1] Linearize transformation disassembly output ($1.li.ll)"
+$llvmdis $1.li.bc -f
 
-#stage=$((stage+1))
-#echo "[$stage.0:$1] Abstract semantics transformation ($1.as.bc)"
-#$llvmopt -load $passes"libabstractSemantics.so" -abstract-semantics $1.li.bc -o $1.as.bc -f
-#echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.as.ll)" 
-#$llvmdis $1.as.bc -f
+stage=$((stage+1))
+echo "[$stage.0:$1] Abstract semantics transformation ($1.as.bc)"
+$llvmopt -load $passes"libabstractSemantics.so" -abstract-semantics $1.li.bc -o $1.as.bc -f
+echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.as.ll)" 
+$llvmdis $1.as.bc -f
 
-cp $1.se.bc $1.as.bc
+stage=$((stage+1))
+echo "[$stage.0:$1] Loop interpretation multipass ($1.lint.bc)"
+$llvmopt -load $passes"libloopInterpreter.so" -loopInterpreter $1.as.bc -o $1.lint.bc -f
+echo "[$stage.1:$1] Abstract semantics transformation dissasembly output ($1.lint.ll)" 
+$llvmdis $1.lint.bc -f
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Recursion brakes setup ($1.rb.bc)"
-$llvmopt -load $passes"librecursionBrakes.so" -rb $1.as.bc -o $1.rb.bc -f
+$llvmopt -load $passes"librecursionBrakes.so" -rb $1.lint.bc -o $1.rb.bc -f
 echo "[$stage.1:$1] Recursion brakes transformation dissasembly output ($1.rb.ll)"
 $llvmdis $1.rb.bc -f
-
-stage=$((stage+1))
-echo "[$stage.0:$1] Unreachable values markup ($1.iu.bc)"
-$llvmopt -load $passes"libinitUnreachable.so" -iu $1.rb.bc -o $1.iu.bc -f
-echo "[$stage.1:$1] Init Unreachable transforamtion dissasembly output ($1.iu.ll)"
-$llvmdis $1.iu.bc -f
 
 stage=$((stage+1))
 echo "[$stage.0:$1] Finalize optimisations ($1.fin.bc)"

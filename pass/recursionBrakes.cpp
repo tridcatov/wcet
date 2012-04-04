@@ -9,26 +9,38 @@
 #include "llvm/Instructions.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
+
+#include "misc/logger.h"
 
 using namespace llvm;
 using namespace std;
 
 namespace {
-    struct RecBrakes: public ModulePass {
-        static char ID;
-        RecBrakes(): ModulePass(ID) {}
 
-        bool runOnModule(Module & );
-    };
+class RecBrakes: public ModulePass {
+private:
+    Logger * logger;
+public:
+    static char ID;
+    
+    RecBrakes(): ModulePass(ID) {
+        logger = new OutLogger("Recursion braker");
+    }
 
-    char RecBrakes::ID = 0;
-    INITIALIZE_PASS(RecBrakes, "rb",
-            "Breaks recursion calls using counters constraints",
-            true, true);
+    ~RecBrakes() {
+        delete logger;
+    }
+
+    bool runOnModule(Module & );
+};
+
+char RecBrakes::ID = 0;
+INITIALIZE_PASS(RecBrakes, "rb",
+        "Breaks recursion calls using counters constraints",
+        true, true);
 };
 
 bool RecBrakes::runOnModule(Module & m) {
-    outs() << "Transforming calls in module " << m.getModuleIdentifier() << "\n";
+    logger->log() << "Transforming calls in module " << m.getModuleIdentifier() << "\n";
     return false;
 }

@@ -154,7 +154,6 @@ bool LinearizePass::runOnFunction(Function & f) {
             params,
             true);
 
-    /* Merging via Twine request */
     parent->getOrInsertFunction ("merge_values", ft);
     mergeFunction = parent->getFunction("merge_values");
 
@@ -170,7 +169,6 @@ bool LinearizePass::runOnFunction(Function & f) {
     IntervalPartition& intervals = getAnalysis<IntervalPartition>();
     intervals.print(outs());
 
-    /* Creating partitions while reducible */
     bool reducible = true;
     vector<IntervalPartition *> tmp;
     tmp.push_back(&intervals);
@@ -192,7 +190,7 @@ bool LinearizePass::runOnFunction(Function & f) {
         processPartition(*tmp[i], f);
     }
     
-    assert(reducible);
+    assert(reducible && "CFG is nit reducible");
 
     return true;
 }

@@ -5,9 +5,7 @@
 #include "llvm/GlobalVariable.h"
 #include "llvm/Constants.h"
 #include "llvm/Instructions.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include <iostream>
+#include "misc/logger.h"
 
 using namespace llvm;
 using namespace std;
@@ -15,18 +13,20 @@ using namespace std;
 namespace {
     class SingleExit : public ModulePass {        
     public:
+        Logger * logger;
         static char ID;
-        SingleExit(): ModulePass(ID) {}
+        SingleExit(): ModulePass(ID) {
+            logger = new ErrLogger("Single exit");
+        }
+
+        ~SingleExit() {
+            delete logger;
+        }
         
         bool runOnModule(Module &M);
         void ensure_single_returning_block(Function* f);
     };
-/* Registering in 2.8 style */
-/*    
-    RegisterOpt<SingleExit> X(
-        "single-exit",
-        "Makes sure each function has a single exit block");
-*/
+
     char SingleExit::ID = 0;
     INITIALIZE_PASS(SingleExit, 
             "singleExit",
@@ -38,8 +38,7 @@ bool SingleExit::runOnModule(Module &M)
 {
     for (Module::iterator F = M.begin(), E = M.end(); F != E; ++F)
     {
-        /* All functions in modules are assumed to be internal */
-        if (!isa<Function>(F)/* || F->isExternal() */)
+        if (!isa<Function>(F))
             continue;
 
         ensure_single_returning_block(F);
@@ -69,12 +68,10 @@ void SingleExit::ensure_single_returning_block(Function* f)
     if (returning_blocks.size() == 1)
         return;
     
-    /* Construncting new terminator basic block */
-//    BasicBlock* result = new BasicBlock("really_single_exit", f);
     BasicBlock* result = BasicBlock::Create(
-            currentContext, // context
-            "ensuredSingleExit", // name
-            f // parent function
+            currentContext,
+            "ensuredSingleExit",
+            f
             );
 
     if (f->getReturnType() != Type::getVoidTy(currentContext))
@@ -90,12 +87,9 @@ void SingleExit::ensure_single_returning_block(Function* f)
 
         for(unsigned i = 0; i < returning_blocks.size(); ++i)
         {
-            // Get the terminator
             ReturnInst* t = static_cast<ReturnInst*>(
                 returning_blocks[i]->getTerminator());
-            // Copy the return value into variable.
             new StoreInst(t->getReturnValue(), return_value, t);
-            // Add branch instruction before it.
             BranchInst * returnBranch = BranchInst::Create(
                     result,
                     t
@@ -104,9 +98,9 @@ void SingleExit::ensure_single_returning_block(Function* f)
             t->removeFromParent();
             delete t;
         }
-        errs() << "[se] " << "function " << f->getName() 
+        logger->log() << "function " << f->getName() 
             << " single exited from " << returning_blocks.size() 
-            << " exits";
+            << " exits" << "\n";
     }
     else
     {
