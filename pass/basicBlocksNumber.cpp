@@ -64,7 +64,7 @@ bool Marker::runOnModule(Module &M)
 
             Value * arg = Constant::getIntegerValue(Type::getInt32Ty(M.getContext()), APInt(32,BBNumber));
             CallInst::Create(updating_function, arg, "", InsertPos);
-            logger->log() << "[bbn] " << BB->getName() << " in " 
+            logger->log() << BB->getName() << " in " 
                 << F->getName() << " numbered as " << BBNumber << "\n";
 
             ++BBNumber;

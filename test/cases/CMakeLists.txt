@@ -1,7 +1,15 @@
-set (cases
-    branch.cpp
-    linear.cpp
-    loop.cpp
+set (case
+        doublecorellatedloop.c
+        doublenestedloop.c
+        multiplebranch.c
+        mutualrecursion.c
+        nestedbranch.c
+        quicksort.c
+        selfrecursion.c
+        simplebranch.c
+        simplelinear.c
+        singleloop.c
+        switchbranch.c
     )
 
 foreach (case ${cases})

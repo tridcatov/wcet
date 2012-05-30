@@ -12,7 +12,7 @@ stage=0
 
 stage=$((stage+1))
 echo "[$stage:$1] Generating llvm source ($1.s)"
-$llvmgcc -O2 -S -emit-llvm $1.cpp
+$llvmgcc -S -emit-llvm $1.cpp
 
 stage=$((stage+1))
 echo "[$stage:$1] Assembling llvm source to bytecode ($1.s.bc)"
